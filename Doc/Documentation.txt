@@ -1,0 +1,463 @@
+
+
+
+SOFTWARE REQUIREMENTS SPECIFICATION
+Distributed Task Scheduler
+Mini MapReduce / Distributed Job Execution Platform
+
+Document TypeSoftware Requirements Specification (SRS)Project TitleDistributed Task Scheduler SystemVersion1.0.0 - FinalTechnology StackLaravel 11 + Vue 3 + MySQL + RedisClassificationAcademic / Class Project
+
+Distributed Systems Engineering
+
+
+
+Table of Contents
+Table of Contents	1
+1. Introduction	1
+1.1 Purpose	1
+1.2 Project Overview	1
+1.3 Scope	1
+1.4 Definitions & Acronyms	1
+1.5 Technology Stack	1
+2. System Architecture	1
+2.1 High-Level Architecture Overview	1
+2.2 Component Descriptions	1
+2.2.1 Coordinator (Laravel Backend)	1
+2.2.2 Worker Nodes	1
+2.2.3 Database (MySQL)	1
+2.2.4 Message Layer (Redis)	1
+2.3 Database Schema (Full Design)	1
+2.3.1 Table: workers	1
+2.3.2 Table: jobs	1
+2.3.3 Table: tasks	1
+2.3.4 Table: task_logs	1
+3. Functional Requirements	1
+3.1 Job Management	1
+FR-JOB-01: Submit Job	1
+FR-JOB-02: List Jobs	1
+FR-JOB-03: Get Job Details	1
+FR-JOB-04: Cancel Job	1
+3.2 Task Distribution	1
+FR-TASK-01: Task Partitioning	1
+FR-TASK-02: Atomic Task Claiming (No Race Conditions)	1
+FR-TASK-03: Pull-Based Scheduling	1
+FR-TASK-04: Task State Machine	1
+3.3 Worker Management	1
+FR-WORKER-01: Worker Self-Registration	1
+FR-WORKER-02: Heartbeat System	1
+FR-WORKER-03: Dead Worker Detection & Task Reassignment	1
+FR-WORKER-04: Worker Statistics	1
+3.4 Fault Tolerance & Retry Logic	1
+FR-FAULT-01: Automatic Task Retry	1
+FR-FAULT-02: Exponential Backoff	1
+FR-FAULT-03: Task Timeout Detection	1
+FR-FAULT-04: Job Failure Propagation	1
+3.5 Dashboard & API	1
+FR-DASH-01: Job Submission UI	1
+FR-DASH-02: Jobs List with Live Progress	1
+FR-DASH-03: Job Detail Drilldown	1
+FR-DASH-04: Worker Status Panel	1
+FR-DASH-05: Metrics Panel	1
+4. API Specification	1
+4.1 Base URL & Conventions	1
+4.2 Jobs API	1
+4.3 Tasks API (Worker-Facing)	1
+4.4 Workers API	1
+4.5 Dashboard / Metrics API	1
+5. Implementation Guide (Phase-by-Phase)	1
+Phase 1: Core Backend Foundation	1
+Step 1.1 — Laravel Project Setup	1
+Step 1.2 — Database Migrations	1
+Step 1.3 — Models & Relationships	1
+Step 1.4 — Job Controller & Partitioning	1
+Phase 2: Worker Nodes & Task Distribution	1
+Step 2.1 — Worker Registration Endpoint	1
+Step 2.2 — Task Claiming with Atomic Lock	1
+Step 2.3 — Worker Artisan Command	1
+Step 2.4 — Running Multiple Workers	1
+Phase 3: Fault Tolerance & Reliability	1
+Step 3.1 — Heartbeat Endpoint & Dead Worker Detection	1
+Step 3.2 — Task Timeout Detection	1
+Step 3.3 — Retry with Exponential Backoff	1
+Step 3.4 — Job Status Propagation	1
+Phase 4: Vue 3 Dashboard	1
+Step 4.1 — Vue 3 Project Setup	1
+Step 4.2 — API Service Layer	1
+Step 4.3 — Dashboard Components	1
+Step 4.4 — Polling / Real-Time Updates	1
+6. Non-Functional Requirements	1
+6.1 Performance	1
+6.2 Reliability	1
+6.3 Scalability	1
+6.4 Security (Basic)	1
+6.5 Maintainability	1
+7. Project File Structure	1
+8. Testing Strategy	1
+8.1 Unit Tests (PHPUnit)	1
+8.2 Integration Tests	1
+8.3 Manual Test Scenarios	1
+9. Deployment & Docker Setup	1
+9.1 docker-compose.yml Structure	1
+9.2 Startup Commands	1
+9.3 Environment Variables	1
+10. Evaluation Criteria & Grading Guide	1
+11. Revision History	1
+
+
+
+1. Introduction
+1.1 Purpose
+This Software Requirements Specification (SRS) defines the complete functional, non-functional, architectural, and implementation requirements for the Distributed Task Scheduler — a real-world mini MapReduce / distributed job execution platform built as a class project.
+The purpose of this document is to serve as the authoritative reference for design, development, testing, and deployment of the system. Every engineer or reviewer reading this document should have enough context to implement the system from scratch or evaluate its completeness against industry standards.
+
+1.2 Project Overview
+The Distributed Task Scheduler is a backend-heavy, distributed computing system that allows users to submit large jobs that are automatically decomposed into smaller parallel tasks. These tasks are dispatched to multiple independent worker nodes that execute them concurrently, report results, and tolerate failures through automatic retry and reassignment logic.
+
+Real-World Analogy
+Think of this system like Google MapReduce, Apache Spark, or Kubernetes Jobs — but simplified for an academic setting. A user submits a 'job' (e.g., process 10,000 records), the system splits it into N tasks, and distributed workers execute them in parallel. The system monitors progress and handles worker crashes gracefully.
+1.3 Scope
+• Job submission and lifecycle management via a REST API
+• Automatic task partitioning from submitted jobs
+• Pull-based task distribution to multiple concurrent worker nodes
+• Fault tolerance: retry failed tasks, detect stuck tasks, reassign dead worker tasks
+• Real-time monitoring dashboard (Vue 3 frontend)
+• Worker heartbeat and registration system
+• Load balancing through pull-based scheduling
+
+1.4 Definitions & Acronyms
+TermDefinitionJobA high-level unit of work submitted by a user. A job is split into multiple tasks.TaskThe smallest unit of executable work. One job produces N tasks.Worker NodeAn independent process/instance that claims and executes tasks.CoordinatorThe Laravel backend acting as the master scheduler/orchestrator.PayloadA JSON object attached to a task describing what work to perform.HeartbeatA periodic HTTP ping sent by a worker to signal it is still alive.Dead WorkerA worker that has stopped sending heartbeats beyond the timeout threshold.Retry CountNumber of times a task has been re-queued after failure.Exponential BackoffA retry strategy where wait time doubles with each failed attempt.Race ConditionA situation where two workers attempt to claim the same task simultaneously.Pull-Based SchedulingWorkers request tasks from the coordinator rather than tasks being pushed to them.MapReduceA programming model for distributed data processing (this project is a simplified variant).SRSSoftware Requirements Specification — this document.REST APIRepresentational State Transfer Application Programming Interface.RedisAn in-memory key-value store used as a message broker / queue backend.
+1.5 Technology Stack
+LayerTechnologyVersionPurposeBackend APILaravel11.xCoordinator, REST endpoints, job/task managementFrontendVue 3 + Vite3.x / 5.xReal-time dashboard, job submission UIDatabaseMySQL8.0+Persistent storage for jobs, tasks, workers, logsCache / QueueRedis7.xTask queue, worker heartbeat, pub/subWorker EngineLaravel Artisan CLI11.xBackground worker processesStylingTailwind CSS3.xDashboard UI stylingReal-timeLaravel Echo + PusherOptionalWebSocket-based live updatesContainerizationDocker + Docker ComposeLatestMulti-worker simulation environment
+
+2. System Architecture
+2.1 High-Level Architecture Overview
+The system follows a Master-Worker distributed architecture. The coordinator (Laravel backend) is the single point of control. Workers are independent, stateless processes that communicate with the coordinator exclusively through the REST API or Redis queues.
+
+SYSTEM ARCHITECTURE DIAGRAM
+[Vue 3 Dashboard]  <-->  [Laravel Coordinator API]  <-->  [MySQL Database]
+                               |                    
+                          [Redis Queue]              
+                        /     |      \              
+               [Worker 1] [Worker 2] [Worker N]       
+2.2 Component Descriptions
+2.2.1 Coordinator (Laravel Backend)
+The coordinator is the brain of the system. It accepts incoming job requests, partitions them into tasks, manages task state transitions, monitors worker health, and serves the dashboard API.
+• Exposes a RESTful HTTP API for clients and workers
+• Manages the job and task lifecycle state machine
+• Assigns tasks to workers using pull-based scheduling
+• Detects and reassigns tasks from dead or timed-out workers
+• Pushes real-time events via WebSockets or Server-Sent Events
+
+2.2.2 Worker Nodes
+Workers are independent processes — either Laravel artisan commands or standalone scripts — that run in their own terminals, containers, or machines.
+• Self-register with the coordinator on startup
+• Continuously poll for available tasks (pull-based)
+• Atomically claim a single task to prevent race conditions
+• Execute task payload logic and report success or failure
+• Send periodic heartbeat signals every 10-15 seconds
+
+2.2.3 Database (MySQL)
+MySQL provides persistent storage for all entities. Redis complements MySQL for ephemeral, high-speed operations like queuing and heartbeat tracking.
+
+2.2.4 Message Layer (Redis)
+Redis serves dual roles: as a Laravel Queue driver for task distribution, and as a pub/sub channel for real-time WebSocket events. Redis also stores worker heartbeat timestamps for fast health checks.
+
+2.3 Database Schema (Full Design)
+The following schema is the authoritative data model for the entire system. Every table is described with its columns, types, constraints, and purpose.
+
+2.3.1 Table: workers
+ColumnTypeConstraintsDescriptionidBIGINT UNSIGNEDPK, AUTO_INCREMENTUnique worker identifierworker_keyVARCHAR(64)UNIQUE, NOT NULLUnique slug used by worker to identify itself (e.g., worker-abc123)hostnameVARCHAR(255)NOT NULLMachine hostname running this workerip_addressVARCHAR(45)NULLIPv4/IPv6 address of the worker machinestatusENUMNOT NULL, DEFAULT 'idle'idle | busy | dead — current operational statecurrent_task_idBIGINT UNSIGNEDFK(tasks.id), NULLTask currently being executed, NULL when idlelast_heartbeat_atTIMESTAMPNULLTimestamp of the most recent heartbeat receivedtasks_completedINT UNSIGNEDDEFAULT 0Total tasks successfully completed by this workertasks_failedINT UNSIGNEDDEFAULT 0Total tasks that failed on this workerregistered_atTIMESTAMPDEFAULT CURRENT_TIMESTAMPWhen the worker first registered
+2.3.2 Table: jobs
+ColumnTypeConstraintsDescriptionidBIGINT UNSIGNEDPK, AUTO_INCREMENTUnique job identifiernameVARCHAR(255)NOT NULLHuman-readable job namedescriptionTEXTNULLOptional description of the job purposetypeVARCHAR(100)NOT NULLJob type code (e.g., image_process, csv_aggregate)statusENUMNOT NULL, DEFAULT 'pending'pending | running | completed | failed | cancelledtotal_tasksINT UNSIGNEDDEFAULT 0Total number of tasks spawned from this jobcompleted_tasksINT UNSIGNEDDEFAULT 0Number of tasks in 'done' statefailed_tasksINT UNSIGNEDDEFAULT 0Number of tasks in permanent 'failed' statepriorityTINYINT UNSIGNEDDEFAULT 5Job priority 1-10 (higher = processed first)submitted_byVARCHAR(255)NULLUser or system that submitted this jobstarted_atTIMESTAMPNULLWhen first task was picked upcompleted_atTIMESTAMPNULLWhen all tasks reached terminal statecreated_atTIMESTAMPDEFAULT CURRENT_TIMESTAMPRecord creation timeupdated_atTIMESTAMPON UPDATE CURRENT_TIMESTAMPLast modification time
+2.3.3 Table: tasks
+ColumnTypeConstraintsDescriptionidBIGINT UNSIGNEDPK, AUTO_INCREMENTUnique task identifierjob_idBIGINT UNSIGNEDFK(jobs.id), NOT NULLParent job referencetask_indexINT UNSIGNEDNOT NULLZero-based order of this task within its jobpayloadJSONNOT NULLJSON blob containing all data the worker needs to executestatusENUMNOT NULL, DEFAULT 'pending'pending | assigned | running | done | failedworker_idBIGINT UNSIGNEDFK(workers.id), NULLWorker currently holding / last ran this taskretry_countTINYINT UNSIGNEDDEFAULT 0Number of times this task has been retriedmax_retriesTINYINT UNSIGNEDDEFAULT 3Maximum allowed retry attemptsfailure_reasonTEXTNULLLast known error message or exception traceassigned_atTIMESTAMPNULLWhen task was last assigned to a workerstarted_atTIMESTAMPNULLWhen worker last reported starting executioncompleted_atTIMESTAMPNULLWhen task reached done or final failed statetimeout_secondsINT UNSIGNEDDEFAULT 300Max allowed execution time before reassignmentcreated_atTIMESTAMPDEFAULT CURRENT_TIMESTAMPRecord creation time
+2.3.4 Table: task_logs
+ColumnTypeConstraintsDescriptionidBIGINT UNSIGNEDPK, AUTO_INCREMENTLog entry IDtask_idBIGINT UNSIGNEDFK(tasks.id), NOT NULLAssociated taskworker_idBIGINT UNSIGNEDFK(workers.id), NULLWorker that generated this loglevelENUMNOT NULLinfo | warning | errormessageTEXTNOT NULLHuman-readable log messagecontextJSONNULLOptional structured data (stack trace, timing, etc.)logged_atTIMESTAMPDEFAULT CURRENT_TIMESTAMPWhen this event occurred
+
+3. Functional Requirements
+3.1 Job Management
+FR-JOB-01: Submit Job
+The system SHALL accept a job submission request containing a name, type, optional description, priority, and an array of task payloads or a dataset to be partitioned.
+• Input validation must reject malformed payloads with HTTP 422 and descriptive errors
+• On success, return HTTP 201 with the new job object and all created task IDs
+• Minimum of 1 task per job; maximum of 10,000 tasks per job
+
+FR-JOB-02: List Jobs
+The system SHALL provide an endpoint to list all jobs with filtering by status, pagination (default 20 per page), and sorting by created_at or priority.
+
+FR-JOB-03: Get Job Details
+The system SHALL return full job details including all associated tasks, their statuses, assigned workers, and progress percentage computed as (completed_tasks / total_tasks) * 100.
+
+FR-JOB-04: Cancel Job
+Users SHALL be able to cancel a job that is in pending or running state. Cancellation marks the job as cancelled and all pending/assigned tasks as cancelled. Running tasks are allowed to finish before the job is marked fully cancelled.
+
+3.2 Task Distribution
+FR-TASK-01: Task Partitioning
+When a job is submitted, the coordinator SHALL automatically partition it into N tasks. Each task receives a JSON payload slice describing its unit of work. For example, a job to process 1,000 records partitioned into 10 tasks produces tasks each responsible for 100 records.
+
+FR-TASK-02: Atomic Task Claiming (No Race Conditions)
+When a worker requests the next available task, the coordinator SHALL use a database-level atomic operation to prevent two workers from claiming the same task. The implementation MUST use one of the following strategies:
+• MySQL SELECT ... FOR UPDATE with a transaction (pessimistic lock)
+• Atomic Redis LPOP to dequeue task IDs
+• Optimistic locking using a version/claimed_at CAS operation
+
+Why This Matters
+Without atomic claiming, two workers could read the same 'pending' task simultaneously, both claim it, and execute it twice — causing data corruption or duplicate results. This is one of the most critical correctness requirements in the system.
+FR-TASK-03: Pull-Based Scheduling
+Workers SHALL pull tasks from the coordinator. The coordinator SHALL NOT push tasks to workers. This ensures natural load balancing: faster workers complete tasks sooner and pull more; slower workers pull fewer. The pull endpoint SHALL return the highest-priority available task for the requesting worker.
+
+FR-TASK-04: Task State Machine
+Every task follows a strict state machine. Illegal transitions SHALL be rejected with HTTP 409.
+From StateTo StateTriggerActorpendingassignedWorker calls GET /api/tasks/nextCoordinatorassignedrunningWorker calls POST /api/tasks/{id}/startWorkerrunningdoneWorker calls POST /api/tasks/{id}/completeWorkerrunningfailed (retriable)Worker calls POST /api/tasks/{id}/failWorkerrunningpending (timeout)Coordinator detects stuck taskCoordinator (Scheduler)failed (retriable)pendingretry_count < max_retriesCoordinatorfailed (retriable)failed (final)retry_count >= max_retriesCoordinatoranycancelledJob is cancelledCoordinator
+3.3 Worker Management
+FR-WORKER-01: Worker Self-Registration
+A worker SHALL register itself with the coordinator upon startup by calling POST /api/workers/register with its worker_key, hostname, and IP. The coordinator creates a worker record if the key is new, or reactivates an existing record if the worker_key already exists (restart scenario).
+
+FR-WORKER-02: Heartbeat System
+Workers SHALL send a heartbeat to POST /api/workers/{key}/heartbeat every 15 seconds. The coordinator records the current timestamp in last_heartbeat_at. Workers that fail to heartbeat within 45 seconds (3 missed intervals) are marked as dead.
+
+FR-WORKER-03: Dead Worker Detection & Task Reassignment
+A scheduled Laravel command (runs every 60 seconds via task scheduler) SHALL scan all workers whose last_heartbeat_at is older than 45 seconds. For each dead worker, it SHALL set worker status to dead and reassign all of that worker's running/assigned tasks back to pending status so they can be picked up by a healthy worker.
+
+FR-WORKER-04: Worker Statistics
+The coordinator SHALL track and expose per-worker statistics: total tasks completed, total tasks failed, current status, and current task assignment.
+
+3.4 Fault Tolerance & Retry Logic
+FR-FAULT-01: Automatic Task Retry
+When a task fails (worker reports failure), the coordinator SHALL automatically re-queue it if retry_count < max_retries. The retry_count SHALL be incremented. If retry_count equals max_retries, the task is permanently marked failed.
+
+FR-FAULT-02: Exponential Backoff
+Retried tasks SHALL not be immediately available for pickup. A delay SHALL be applied using exponential backoff: delay_seconds = 2^retry_count * 5. For example: first retry = 10 seconds, second retry = 20 seconds, third retry = 40 seconds.
+
+FR-FAULT-03: Task Timeout Detection
+A scheduled command running every 2 minutes SHALL check for tasks in running state where the current time exceeds started_at + timeout_seconds. Such tasks SHALL be treated as failures and go through the retry logic. The failure_reason is set to 'task_timeout'.
+
+FR-FAULT-04: Job Failure Propagation
+When all tasks of a job have reached a terminal state (done or failed), the coordinator SHALL update the job status. If all tasks are done, the job is completed. If any tasks are permanently failed, the job is failed. Job completion events are broadcast to all connected dashboard clients.
+
+3.5 Dashboard & API
+FR-DASH-01: Job Submission UI
+The Vue 3 dashboard SHALL provide a form to submit new jobs with fields: name, description, type, priority, and task count (auto-generates test payloads for demo purposes). Form validation must run client-side before API submission.
+
+FR-DASH-02: Jobs List with Live Progress
+The dashboard SHALL display a sortable, filterable list of all jobs with: name, status badge, progress bar (%), total/completed/failed task counts, and elapsed time. Data SHALL refresh every 5 seconds via polling or instantly via WebSocket events.
+
+FR-DASH-03: Job Detail Drilldown
+Clicking a job SHALL show a detail view with all tasks listed in a table showing task index, status, assigned worker, retry count, duration, and failure reason. Tasks SHALL be color-coded by status.
+
+FR-DASH-04: Worker Status Panel
+A workers panel SHALL display all registered workers with their status (idle/busy/dead), last heartbeat timestamp, current task, and cumulative statistics. Dead workers SHALL be visually highlighted in red.
+
+FR-DASH-05: Metrics Panel
+A metrics section SHALL display system-wide statistics: total jobs, total tasks, tasks per second (throughput), average task duration, total failures, total retries, and worker utilization percentage.
+
+
+4. API Specification
+4.1 Base URL & Conventions
+• Base URL: http://localhost:8000/api
+• All requests and responses use Content-Type: application/json
+• Authentication: Bearer token (Laravel Sanctum) — optional for class project
+• Timestamps: ISO 8601 UTC format
+• Errors follow RFC 7807 Problem Details format
+
+4.2 Jobs API
+MethodEndpointDescriptionRequest BodyPOST/api/jobsSubmit a new job{"name":"...", "type":"...", "priority":5, "task_count":100}GET/api/jobsList jobs (paginated, filterable by status)Query: ?status=running&per_page=20GET/api/jobs/{id}Get job with all tasks and progressNoneGET/api/jobs/{id}/tasksGet all tasks for a specific jobQuery: ?status=failedDELETE/api/jobs/{id}Cancel a jobNone
+4.3 Tasks API (Worker-Facing)
+MethodEndpointDescriptionRequest BodyGET/api/tasks/nextClaim next available task (atomic)Header: X-Worker-Key: worker-abcPOST/api/tasks/{id}/startReport task execution started{"worker_key":"worker-abc"}POST/api/tasks/{id}/completeReport task completed successfully{"result": {...}, "duration_ms": 1200}POST/api/tasks/{id}/failReport task failed with reason{"reason":"Connection refused","worker_key":"..."}
+4.4 Workers API
+MethodEndpointDescriptionRequest BodyPOST/api/workers/registerRegister a new worker{"worker_key":"worker-abc","hostname":"server1","ip":"127.0.0.1"}POST/api/workers/{key}/heartbeatSend heartbeat ping{"status":"idle"}GET/api/workersList all workers with statsNoneGET/api/workers/{key}Get single worker detailsNone
+4.5 Dashboard / Metrics API
+MethodEndpointDescriptionResponse SummaryGET/api/metricsSystem-wide statistics snapshot{"total_jobs":50,"active_workers":4,"tasks_per_sec":12.5}GET/api/metrics/historyTime-series metrics for chartsArray of {timestamp, throughput, error_rate}
+
+5. Implementation Guide (Phase-by-Phase)
+This section provides step-by-step implementation instructions structured in four phases. Each phase is independently testable before proceeding to the next.
+
+Phase 1: Core Backend Foundation
+Phase 1 Goal
+By the end of Phase 1, you can submit a job via API and see tasks created in the database. No workers yet.
+Step 1.1 — Laravel Project Setup
+1. Create new Laravel project: composer create-project laravel/laravel task-scheduler
+2. Install dependencies: composer require laravel/sanctum predis/predis
+3. Configure .env: set DB_* (MySQL) and REDIS_HOST, QUEUE_CONNECTION=redis
+4. Run: php artisan migrate
+
+Step 1.2 — Database Migrations
+Create migrations in order (foreign key dependencies require this order):
+5. php artisan make:migration create_workers_table
+6. php artisan make:migration create_jobs_table
+7. php artisan make:migration create_tasks_table
+8. php artisan make:migration create_task_logs_table
+Implement each migration using the schema defined in Section 2.3. Run: php artisan migrate
+
+Step 1.3 — Models & Relationships
+9. php artisan make:model Worker -m
+10. php artisan make:model Job -m
+11. php artisan make:model Task -m
+12. php artisan make:model TaskLog -m
+Add relationships: Job hasMany Tasks. Task belongsTo Job, belongsTo Worker. Worker hasMany Tasks.
+
+Step 1.4 — Job Controller & Partitioning
+13. php artisan make:controller Api/JobController --api
+Implement store() method: validate input, create Job record, call TaskPartitionerService to split into N tasks, create all Task records in a single DB transaction.
+
+Task Partitioner Service Pattern
+Create app/Services/TaskPartitionerService.php. Method: partition(Job $job, int $taskCount): array. This service generates the JSON payload for each task (e.g., {"start_index": 0, "end_index": 99, "job_type": "image_process"}). This is the MapReduce "Map" step.
+Phase 2: Worker Nodes & Task Distribution
+Phase 2 Goal
+By end of Phase 2, you can run multiple workers in separate terminals and watch them pick up and process tasks concurrently.
+Step 2.1 — Worker Registration Endpoint
+14. php artisan make:controller Api/WorkerController
+Implement register() action: use firstOrCreate on worker_key. Set status to idle and update last_heartbeat_at on re-registration.
+
+Step 2.2 — Task Claiming with Atomic Lock
+This is the most critical piece of code. The task claiming MUST be atomic to prevent race conditions.
+// TaskController@next — Atomic task claiming
+public function next(Request $request): JsonResponse {
+    $worker = Worker::where('worker_key', $request->header('X-Worker-Key'))->firstOrFail();
+    $task = DB::transaction(function () use ($worker) {
+        $task = Task::where('status', 'pending')
+            ->orderBy('created_at')->lockForUpdate()->first();
+        if (!$task) return null;
+        $task->update(['status'=>'assigned', 'worker_id'=>$worker->id, 'assigned_at'=>now()]);
+        return $task;
+    });
+    if (!$task) return response()->json(['message'=>'no_tasks_available'], 204);
+    return response()->json($task);
+}
+Step 2.3 — Worker Artisan Command
+15. php artisan make:command WorkerRun
+Implement the worker loop inside the handle() method. The worker runs in an infinite loop: poll for task, execute, report result, send heartbeat. See the worker loop pseudocode:
+• Register with coordinator (POST /api/workers/register)
+• Loop forever: GET /api/tasks/next
+• If no task: sleep(3), continue
+• POST /api/tasks/{id}/start
+• Execute payload (simulate with usleep, or implement real logic)
+• POST /api/tasks/{id}/complete or /fail
+• Heartbeat is sent every 15 seconds regardless of task state
+
+Step 2.4 — Running Multiple Workers
+Open three separate terminal windows and run:
+• Terminal 1: php artisan worker:run --key=worker-001
+• Terminal 2: php artisan worker:run --key=worker-002
+• Terminal 3: php artisan worker:run --key=worker-003
+
+Phase 3: Fault Tolerance & Reliability
+Phase 3 Goal
+By end of Phase 3, killing a worker mid-task will result in the task being automatically reassigned to a healthy worker within 60 seconds.
+Step 3.1 — Heartbeat Endpoint & Dead Worker Detection
+16. Add heartbeat route: POST /api/workers/{key}/heartbeat
+17. php artisan make:command DetectDeadWorkers
+The command logic: find all workers where last_heartbeat_at < now() - 45 seconds AND status != dead. For each: set status = dead, find all their assigned/running tasks, set those tasks back to pending, increment retry_count.
+18. Register in app/Console/Kernel.php: $schedule->command('workers:detect-dead')->everyMinute()
+
+Step 3.2 — Task Timeout Detection
+19. php artisan make:command DetectTimedOutTasks
+Logic: find tasks where status = running AND started_at < now() - timeout_seconds. Apply same fail/retry logic as dead worker detection. Schedule to run every 2 minutes.
+
+Step 3.3 — Retry with Exponential Backoff
+When re-queuing a retried task, set a available_after timestamp = now() + (2^retry_count * 5) seconds. Modify the task claim query to include AND (available_after IS NULL OR available_after <= NOW()).
+
+Step 3.4 — Job Status Propagation
+After every task state change, call a JobStatusService::recalculate(Job $job) method. This method counts done/failed/pending tasks and updates the job status accordingly.
+
+Phase 4: Vue 3 Dashboard
+Phase 4 Goal
+A real-time Vue 3 dashboard that shows all jobs, task progress, worker statuses, and system metrics — updating live.
+Step 4.1 — Vue 3 Project Setup
+20. npm create vite@latest frontend -- --template vue
+21. cd frontend && npm install axios vue-router@4 pinia @headlessui/vue
+22. npm install -D tailwindcss postcss autoprefixer && npx tailwindcss init -p
+
+Step 4.2 — API Service Layer
+Create src/services/api.js using Axios with baseURL pointed at the Laravel API. Export functions: getJobs(), getJob(id), submitJob(data), getWorkers(), getMetrics(). Use Pinia stores to cache and reactively update this data.
+
+Step 4.3 — Dashboard Components
+Build these Vue components in src/components/:
+• JobsTable.vue — sortable job list with status badges and progress bars
+• JobDetail.vue — drilldown task table with color-coded statuses
+• WorkersGrid.vue — card grid showing each worker's status, heartbeat, and stats
+• MetricsBar.vue — top-level KPI row (total jobs, throughput, worker count)
+• JobSubmitForm.vue — form to submit new jobs with validation
+• StatusBadge.vue — reusable colored badge component
+
+Step 4.4 — Polling / Real-Time Updates
+For polling (simpler): in each component's mounted() hook, set an interval to call the API every 5 seconds. Clear the interval in unmounted(). For WebSockets (impressive): install laravel-echo and pusher-js, configure Laravel Broadcasting with Pusher or Soketi (self-hosted).
+
+
+6. Non-Functional Requirements
+6.1 Performance
+• The coordinator API SHALL respond to task claim requests within 200ms under normal load
+• The system SHALL support at least 10 concurrent worker nodes
+• Task throughput SHALL reach at least 50 tasks/minute with 5 active workers
+• Database queries on tasks table SHALL use indexes on (status, job_id, worker_id)
+
+6.2 Reliability
+• No task SHALL be permanently lost due to a worker crash (guaranteed by dead worker detection)
+• No two workers SHALL execute the same task simultaneously (guaranteed by atomic claiming)
+• The scheduler commands SHALL run reliably without missed executions
+
+6.3 Scalability
+• Adding more workers SHALL linearly increase throughput without coordinator changes
+• The database schema SHALL support up to 1 million tasks without index degradation
+
+6.4 Security (Basic)
+• Worker API endpoints SHALL require the X-Worker-Key header
+• SQL injection is prevented by using Laravel Eloquent parameterized queries
+• CORS is configured to allow only the Vue frontend origin
+
+6.5 Maintainability
+• All business logic SHALL be in Service classes, not controllers
+• All scheduled commands SHALL log their actions to storage/logs/scheduler.log
+• PHPUnit tests SHALL cover: task claiming atomicity, retry logic, dead worker detection
+
+
+7. Project File Structure
+Below is the recommended Laravel project directory structure for this system:
+PathPurposeapp/Http/Controllers/Api/JobController.phpJob CRUD, submission, cancellationapp/Http/Controllers/Api/TaskController.phpTask claiming, status updatesapp/Http/Controllers/Api/WorkerController.phpRegistration, heartbeat, listingapp/Http/Controllers/Api/MetricsController.phpDashboard statisticsapp/Services/TaskPartitionerService.phpSplits jobs into task payloadsapp/Services/TaskClaimService.phpAtomic task claiming logicapp/Services/JobStatusService.phpRecalculates job status from tasksapp/Services/WorkerHealthService.phpDead worker detection logicapp/Console/Commands/WorkerRun.phpWorker process main loopapp/Console/Commands/DetectDeadWorkers.phpScheduled: marks dead workersapp/Console/Commands/DetectTimedOutTasks.phpScheduled: handles timed-out tasksapp/Models/Job.phpJob Eloquent modelapp/Models/Task.phpTask Eloquent modelapp/Models/Worker.phpWorker Eloquent modelapp/Models/TaskLog.phpTaskLog Eloquent modeldatabase/migrations/All 4 migration filesroutes/api.phpAll API route definitionsfrontend/src/components/All Vue 3 dashboard componentsfrontend/src/stores/Pinia state storesfrontend/src/services/api.jsAxios API service layer
+
+8. Testing Strategy
+8.1 Unit Tests (PHPUnit)
+Test ClassWhat It TestsTaskClaimServiceTestVerify only ONE task is assigned when 10 workers call claim simultaneously (concurrent test)RetryLogicTestVerify retry_count increments, backoff is applied, and permanent failure at max_retriesDeadWorkerDetectionTestVerify tasks are reassigned after worker heartbeat timeoutJobStatusPropagationTestVerify job status updates correctly as tasks complete/failTaskTimeoutTestVerify stuck tasks are detected and re-queued after timeout
+8.2 Integration Tests
+• Submit a job with 50 tasks, start 3 workers, verify all tasks complete
+• Kill a worker mid-execution, verify tasks are reassigned within 60 seconds
+• Simulate task failure, verify retry and eventual failure after max_retries
+
+8.3 Manual Test Scenarios
+23. Happy Path: Submit job ? 3 workers complete all tasks ? job marked completed
+24. Worker Crash: Kill worker-001 mid-task ? worker detected as dead ? task reassigned to worker-002
+25. Network Failure: Block worker heartbeat ? worker marked dead ? tasks redistributed
+26. Task Failure: Worker reports failure ? retry 3 times ? permanent failure
+27. Load Test: Submit 1,000-task job with 5 workers ? measure throughput
+
+
+9. Deployment & Docker Setup
+9.1 docker-compose.yml Structure
+The Docker Compose file defines 6 services to simulate a real distributed environment:
+ServiceImagePurposecoordinatorphp:8.3-fpm + composerLaravel coordinator API (port 8000)mysqlmysql:8.0Primary databaseredisredis:7-alpineQueue broker and cacheworker-1Same as coordinatorWorker node 1 (php artisan worker:run --key=worker-001)worker-2Same as coordinatorWorker node 2 (php artisan worker:run --key=worker-002)worker-3Same as coordinatorWorker node 3 (php artisan worker:run --key=worker-003)frontendnode:20-alpineVue 3 dev server (port 5173)
+9.2 Startup Commands
+• docker-compose up --build -d  (start all services)
+• docker-compose scale worker-1=3  (add more worker instances)
+• docker-compose exec coordinator php artisan migrate --seed
+• docker-compose logs -f worker-1  (follow worker logs)
+
+9.3 Environment Variables
+VariableValue (Docker)PurposeDB_HOSTmysqlMySQL service nameDB_DATABASEtask_schedulerDatabase nameREDIS_HOSTredisRedis service nameQUEUE_CONNECTIONredisUse Redis as queue driverWORKER_HEARTBEAT_INTERVAL15Seconds between heartbeatsWORKER_DEAD_THRESHOLD45Seconds before worker marked deadTASK_DEFAULT_TIMEOUT300Default task timeout in seconds
+
+10. Evaluation Criteria & Grading Guide
+This section maps each core requirement to implementation evidence so you can verify your implementation is complete and impressive.
+
+RequirementImplementation EvidencePoints WeightJob Queuejobs + tasks tables; POST /api/jobs creates job + N tasks atomically15%Worker Nodes3+ workers running concurrently via artisan command; all registered in workers table20%Retry Failed Tasksretry_count incremented on failure; task re-queued until max_retries; exponential backoff20%Load BalancingPull-based model demonstrated: faster workers claim more tasks; no push mechanism15%Race Condition PreventionlockForUpdate() transaction visible in code; no duplicate task execution in logs10%Dead Worker DetectionKill a worker, wait 60s, verify tasks reassigned in task_logs10%Vue DashboardLive progress bars, worker status panel, job submission form10%Extra Credit: Dockerdocker-compose.yml with 3+ worker containers, coordinator, mysql, redis+5%Extra Credit: WebSocketsReal-time updates via Laravel Echo + Soketi/Pusher+5%
+Critical Success Factors
+1. Atomic task claiming — if you can demonstrate that 10 concurrent workers never get the same task, you have proven the core distributed systems concept. 2. Dead worker reassignment — demonstrate this live: kill a worker, show the task is picked up by another worker. 3. Multiple real workers — running 3+ independent worker processes (or containers) is what makes this a distributed system.
+
+
+11. Revision History
+VersionDateAuthorDescription1.0.02026-05-06Project TeamInitial full SRS — complete functional, architecture, API, implementation, and testing specification
+
+End of Software Requirements Specification — Distributed Task Scheduler
+Distributed Task Scheduler — SRSVersion 1.0.0
+
+
+Page 1 of 1   |   Distributed Task Scheduler SRS   |   Confidential
+

@@ -3,6 +3,7 @@
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use Illuminate\Console\Scheduling\Schedule;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -15,6 +16,23 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->api(prepend: [
             \Illuminate\Http\Middleware\HandleCors::class,
         ]);
+        
+        // Register custom middleware aliases
+        $middleware->alias([
+            'admin' => \App\Http\Middleware\AdminMiddleware::class,
+            'worker.auth' => \App\Http\Middleware\WorkerAuthMiddleware::class,
+        ]);
+    })
+    ->withSchedule(function (Schedule $schedule): void {
+        // Detect dead workers every minute
+        $schedule->command('workers:detect-dead')
+            ->everyMinute()
+            ->withoutOverlapping();
+
+        // Detect timed-out tasks every 2 minutes
+        $schedule->command('tasks:detect-timeout')
+            ->everyTwoMinutes()
+            ->withoutOverlapping();
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //

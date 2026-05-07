@@ -42,12 +42,20 @@ apiClient.interceptors.response.use(
         case 404:
           console.error('Resource not found')
           break
+        case 422:
+          console.error('Validation Error (422):', error.response.data)
+          console.error('Validation Errors:', error.response.data.errors)
+          break
         case 500:
           console.error('Server error')
           break
         default:
           console.error('An error occurred:', error.response.data)
       }
+    } else if (error.request) {
+      console.error('No response received:', error.request)
+    } else {
+      console.error('Error setting up request:', error.message)
     }
     return Promise.reject(error)
   }

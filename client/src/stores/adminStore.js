@@ -1,22 +1,26 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import api from '@/api'
+import apiClient from '@/api/axios'
 
 export const useAdminStore = defineStore('admin', () => {
-  const allJobs = ref([])
-  const allUsers = ref([])
+  // ── State ──────────────────────────────────────────────────────────────────
+  const allJobs    = ref([])
+  const allUsers   = ref([])
   const allWorkers = ref([])
-  const systemMetrics = ref(null)
+  const systemMetrics  = ref(null)
+  const metricsHistory = ref(null)
+  const activityFeed   = ref([])
   const loading = ref(false)
-  const error = ref(null)
+  const error   = ref(null)
 
-  // Fetch all jobs (admin view)
+  // ── Jobs ───────────────────────────────────────────────────────────────────
   async function fetchAllJobs(params = {}) {
     loading.value = true
     error.value = null
     try {
-      const response = await api.get('/admin/jobs', { params })
-      allJobs.value = response.data.data || response.data
+      const response = await apiClient.get('/admin/jobs', { params })
+      // Paginated response: { data: [...], total, ... }
+      allJobs.value = response.data.data || response.data.jobs || []
       return { success: true, data: response.data }
     } catch (err) {
       error.value = err.response?.data?.message || 'Failed to fetch jobs'
@@ -26,13 +30,41 @@ export const useAdminStore = defineStore('admin', () => {
     }
   }
 
-  // Fetch all users
+  async function forceCancelJob(jobId) {
+    try {
+      const response = await apiClient.post(`/admin/jobs/${jobId}/cancel`)
+      return { success: true, data: response.data }
+    } catch (err) {
+      return { success: false, error: err.response?.data?.message || 'Failed to cancel job' }
+    }
+  }
+
+  async function retryJob(jobId) {
+    try {
+      const response = await apiClient.post(`/admin/jobs/${jobId}/retry`)
+      return { success: true, data: response.data }
+    } catch (err) {
+      return { success: false, error: err.response?.data?.message || 'Failed to retry job' }
+    }
+  }
+
+  async function deleteJob(jobId) {
+    try {
+      const response = await apiClient.delete(`/admin/jobs/${jobId}`)
+      allJobs.value = allJobs.value.filter(j => j.id !== jobId)
+      return { success: true, data: response.data }
+    } catch (err) {
+      return { success: false, error: err.response?.data?.message || 'Failed to delete job' }
+    }
+  }
+
+  // ── Users ──────────────────────────────────────────────────────────────────
   async function fetchAllUsers(params = {}) {
     loading.value = true
     error.value = null
     try {
-      const response = await api.get('/admin/users', { params })
-      allUsers.value = response.data.data || response.data
+      const response = await apiClient.get('/admin/users', { params })
+      allUsers.value = response.data.data || response.data.users || []
       return { success: true, data: response.data }
     } catch (err) {
       error.value = err.response?.data?.message || 'Failed to fetch users'
@@ -42,13 +74,35 @@ export const useAdminStore = defineStore('admin', () => {
     }
   }
 
-  // Fetch all workers
+  async function updateUser(userId, data) {
+    try {
+      const response = await apiClient.put(`/admin/users/${userId}`, data)
+      // Update local state
+      const idx = allUsers.value.findIndex(u => u.id === userId)
+      if (idx !== -1) allUsers.value[idx] = { ...allUsers.value[idx], ...response.data.user }
+      return { success: true, data: response.data }
+    } catch (err) {
+      return { success: false, error: err.response?.data?.message || 'Failed to update user' }
+    }
+  }
+
+  async function deleteUser(userId) {
+    try {
+      const response = await apiClient.delete(`/admin/users/${userId}`)
+      allUsers.value = allUsers.value.filter(u => u.id !== userId)
+      return { success: true, data: response.data }
+    } catch (err) {
+      return { success: false, error: err.response?.data?.message || 'Failed to delete user' }
+    }
+  }
+
+  // ── Workers ────────────────────────────────────────────────────────────────
   async function fetchAllWorkers(params = {}) {
     loading.value = true
     error.value = null
     try {
-      const response = await api.get('/admin/workers', { params })
-      allWorkers.value = response.data.workers || response.data
+      const response = await apiClient.get('/admin/workers', { params })
+      allWorkers.value = response.data.workers || response.data.data || []
       return { success: true, data: response.data }
     } catch (err) {
       error.value = err.response?.data?.message || 'Failed to fetch workers'
@@ -58,13 +112,36 @@ export const useAdminStore = defineStore('admin', () => {
     }
   }
 
-  // Fetch system metrics
+  async function markWorkerDead(workerKey) {
+    try {
+      const response = await apiClient.post(`/admin/workers/${workerKey}/mark-dead`)
+      // Update local state
+      const idx = allWorkers.value.findIndex(w => w.worker_key === workerKey)
+      if (idx !== -1) allWorkers.value[idx].status = 'dead'
+      return { success: true, data: response.data }
+    } catch (err) {
+      return { success: false, error: err.response?.data?.message || 'Failed to mark worker as dead' }
+    }
+  }
+
+  async function deleteWorker(workerKey) {
+    try {
+      const response = await apiClient.delete(`/admin/workers/${workerKey}`)
+      allWorkers.value = allWorkers.value.filter(w => w.worker_key !== workerKey)
+      return { success: true, data: response.data }
+    } catch (err) {
+      return { success: false, error: err.response?.data?.message || 'Failed to delete worker' }
+    }
+  }
+
+  // ── Metrics ────────────────────────────────────────────────────────────────
   async function fetchSystemMetrics() {
     loading.value = true
     error.value = null
     try {
-      const response = await api.get('/admin/metrics')
+      const response = await apiClient.get('/admin/metrics')
       systemMetrics.value = response.data
+      activityFeed.value  = response.data?.activity_feed || []
       return { success: true, data: response.data }
     } catch (err) {
       error.value = err.response?.data?.message || 'Failed to fetch metrics'
@@ -74,29 +151,61 @@ export const useAdminStore = defineStore('admin', () => {
     }
   }
 
-  // Fetch dashboard data (metrics + recent jobs)
+  async function fetchMetricsHistory(period = 'day') {
+    loading.value = true
+    error.value = null
+    try {
+      const response = await apiClient.get('/admin/metrics/history', { params: { period } })
+      metricsHistory.value = response.data
+      return { success: true, data: response.data }
+    } catch (err) {
+      error.value = err.response?.data?.message || 'Failed to fetch metrics history'
+      return { success: false, error: error.value }
+    } finally {
+      loading.value = false
+    }
+  }
+
+  async function fetchActivityFeed(limit = 50) {
+    loading.value = true
+    error.value = null
+    try {
+      const response = await apiClient.get('/admin/metrics/activity', { params: { limit } })
+      activityFeed.value = response.data?.activity || []
+      return { success: true, data: response.data }
+    } catch (err) {
+      error.value = err.response?.data?.message || 'Failed to fetch activity feed'
+      return { success: false, error: error.value }
+    } finally {
+      loading.value = false
+    }
+  }
+
+  // ── Dashboard (parallel fetch) ─────────────────────────────────────────────
   async function fetchDashboardData(params = {}) {
     loading.value = true
     error.value = null
     try {
-      // Fetch metrics and jobs in parallel
-      const [metricsResponse, jobsResponse] = await Promise.all([
-        api.get('/admin/metrics'),
-        api.get('/admin/jobs', { params: { per_page: params.limit || 10, sort_by: 'created_at', sort_order: 'desc', ...params } })
+      const [metricsRes, jobsRes] = await Promise.all([
+        apiClient.get('/admin/metrics'),
+        apiClient.get('/admin/jobs', {
+          params: {
+            per_page: params.limit || 10,
+            sort_by: 'created_at',
+            sort_order: 'desc',
+            ...params,
+          },
+        }),
       ])
 
-      // Store the metrics
-      systemMetrics.value = metricsResponse.data
+      systemMetrics.value = metricsRes.data
+      activityFeed.value  = metricsRes.data?.activity_feed || []
+      allJobs.value       = jobsRes.data.data || jobsRes.data.jobs || []
 
-      // Store the recent jobs
-      allJobs.value = jobsResponse.data.data || jobsResponse.data.jobs || []
-
-      const dashboardData = {
-        metrics: metricsResponse.data,
-        recentJobs: allJobs.value
+      return {
+        success: true,
+        data: { metrics: metricsRes.data, recentJobs: allJobs.value },
       }
-
-      return { success: true, data: dashboardData }
     } catch (err) {
       error.value = err.response?.data?.message || 'Failed to fetch dashboard data'
       return { success: false, error: error.value }
@@ -105,101 +214,31 @@ export const useAdminStore = defineStore('admin', () => {
     }
   }
 
-  // Force cancel a job
-  async function forceCancelJob(jobId) {
-    try {
-      const response = await api.post(`/admin/jobs/${jobId}/cancel`)
-      return { success: true, data: response.data }
-    } catch (err) {
-      return {
-        success: false,
-        error: err.response?.data?.message || 'Failed to cancel job'
-      }
-    }
-  }
-
-  // Delete a job
-  async function deleteJob(jobId) {
-    try {
-      const response = await api.delete(`/admin/jobs/${jobId}`)
-      return { success: true, data: response.data }
-    } catch (err) {
-      return {
-        success: false,
-        error: err.response?.data?.message || 'Failed to delete job'
-      }
-    }
-  }
-
-  // Mark worker as dead
-  async function markWorkerDead(workerKey) {
-    try {
-      const response = await api.post(`/admin/workers/${workerKey}/mark-dead`)
-      return { success: true, data: response.data }
-    } catch (err) {
-      return {
-        success: false,
-        error: err.response?.data?.message || 'Failed to mark worker as dead'
-      }
-    }
-  }
-
-  // Delete a worker
-  async function deleteWorker(workerKey) {
-    try {
-      const response = await api.delete(`/admin/workers/${workerKey}`)
-      return { success: true, data: response.data }
-    } catch (err) {
-      return {
-        success: false,
-        error: err.response?.data?.message || 'Failed to delete worker'
-      }
-    }
-  }
-
-  // Update user
-  async function updateUser(userId, data) {
-    try {
-      const response = await api.put(`/admin/users/${userId}`, data)
-      return { success: true, data: response.data }
-    } catch (err) {
-      return {
-        success: false,
-        error: err.response?.data?.message || 'Failed to update user'
-      }
-    }
-  }
-
-  // Delete user
-  async function deleteUser(userId) {
-    try {
-      const response = await api.delete(`/admin/users/${userId}`)
-      return { success: true, data: response.data }
-    } catch (err) {
-      return {
-        success: false,
-        error: err.response?.data?.message || 'Failed to delete user'
-      }
-    }
-  }
-
   return {
+    // State
     allJobs,
     allUsers,
     allWorkers,
     systemMetrics,
+    metricsHistory,
+    activityFeed,
     loading,
     error,
+
+    // Actions
     fetchAllJobs,
-    fetchAllUsers,
-    fetchAllWorkers,
-    fetchSystemMetrics,
-    fetchDashboardData,
     forceCancelJob,
+    retryJob,
     deleteJob,
+    fetchAllUsers,
+    updateUser,
+    deleteUser,
+    fetchAllWorkers,
     markWorkerDead,
     deleteWorker,
-    updateUser,
-    deleteUser
+    fetchSystemMetrics,
+    fetchMetricsHistory,
+    fetchActivityFeed,
+    fetchDashboardData,
   }
 })

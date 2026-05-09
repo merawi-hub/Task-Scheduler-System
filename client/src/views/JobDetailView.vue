@@ -1,83 +1,98 @@
 <template>
-  <div class="min-h-screen bg-gray-50">
-    <!-- Header -->
-    <header class="bg-white shadow-sm border-b border-gray-200">
-      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-        <div class="flex items-center justify-between">
-          <div class="flex items-center space-x-4">
-            <button
-              @click="goBack"
-              class="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-            >
-              <svg class="w-6 h-6 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-              </svg>
-            </button>
-            <div>
-              <h1 class="text-2xl font-bold text-gray-900">Job Details</h1>
-              <p class="text-sm text-gray-500 mt-1">View job progress and task details</p>
-            </div>
-          </div>
-          <div class="flex items-center space-x-3">
-            <div class="flex items-center space-x-2 text-sm">
-              <div class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
-              <span class="text-gray-600">Auto-refresh: 5s</span>
-            </div>
-            <button
-              @click="refresh"
-              class="btn btn-secondary flex items-center space-x-2"
-              :disabled="loading"
-            >
-              <svg
-                class="w-4 h-4"
-                :class="{ 'animate-spin': loading }"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-              </svg>
-              <span>Refresh</span>
-            </button>
-          </div>
-        </div>
-      </div>
-    </header>
+  <div class="flex h-screen bg-gray-50">
+    <!-- Sidebar -->
+    <UserSidebar />
 
     <!-- Main Content -->
-    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <!-- Loading State -->
-      <div v-if="initialLoading" class="text-center py-12">
-        <div class="inline-block animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600"></div>
-        <p class="mt-4 text-gray-600">Loading job details...</p>
-      </div>
-
-      <!-- Error State -->
-      <div v-else-if="error" class="card">
-        <div class="text-center py-12">
-          <svg class="mx-auto h-12 w-12 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-          <h3 class="mt-2 text-sm font-medium text-gray-900">Error Loading Job</h3>
-          <p class="mt-1 text-sm text-red-600">{{ error }}</p>
-          <div class="mt-6">
-            <button @click="goBack" class="btn btn-primary">
-              Go Back to Dashboard
-            </button>
+    <div class="flex-1 ml-64 overflow-auto">
+      <!-- Header -->
+      <header class="bg-white border-b border-gray-200 sticky top-0 z-10">
+        <div class="px-8 py-4">
+          <div class="flex items-center gap-3">
+            <router-link
+              to="/my-jobs"
+              class="flex items-center gap-1.5 text-sm text-indigo-600 hover:text-indigo-700 font-medium transition-colors"
+            >
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
+              </svg>
+              Back to My Jobs
+            </router-link>
+            <span class="text-gray-300">/</span>
+            <h1 class="text-lg font-semibold text-gray-900">Job Details</h1>
           </div>
         </div>
-      </div>
+      </header>
 
-      <!-- Job Detail Component -->
-      <div v-else-if="job">
-        <JobDetail
-          :job="job"
-          :tasks="tasks"
-          :tasks-loading="tasksLoading"
-          @cancel-job="handleCancelJob"
-        />
-      </div>
-    </main>
+      <!-- Main Content -->
+      <main class="p-8">
+        <!-- Loading State -->
+        <div v-if="initialLoading" class="text-center py-12">
+          <div class="inline-block animate-spin rounded-full h-16 w-16 border-b-2 border-indigo-600"></div>
+          <p class="mt-4 text-gray-600">Loading job details...</p>
+        </div>
+
+        <!-- Error State -->
+        <div v-else-if="error" class="max-w-2xl mx-auto">
+          <div class="bg-white rounded-2xl shadow-lg border border-gray-200 p-8">
+            <div class="text-center">
+              <div class="mx-auto w-20 h-20 bg-red-50 rounded-full flex items-center justify-center mb-4">
+                <svg class="w-10 h-10 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <h3 class="text-2xl font-bold text-gray-900 mb-2">Error Loading Job</h3>
+              <p class="text-gray-600 mb-6">{{ error }}</p>
+              <div class="flex items-center justify-center gap-3">
+                <button @click="goToMyJobs" class="px-6 py-3 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-all font-semibold">
+                  Go to My Jobs
+                </button>
+                <button @click="goBack" class="px-6 py-3 border-2 border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-all font-semibold">
+                  Go Back
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Job Detail Component -->
+        <div v-else-if="job">
+          <!-- ── COMPLETED / FAILED — show completion banner first ─────────── -->
+          <JobCompletionBanner
+            v-if="job.status === 'completed' || job.status === 'failed'"
+            :job-id="job.id"
+            class="mb-6"
+            @view-tasks="scrollToTasks"
+            @submit-another="router.push('/submit-job')"
+            @go-to-jobs="router.push('/my-jobs')"
+          />
+
+          <!-- Worker Activity Panel — shown when job is pending or running -->
+          <WorkerActivityPanel
+            v-if="job.status === 'pending' || job.status === 'running'"
+            :job-id="job.id"
+            class="mb-6"
+          />
+
+          <!-- Load Balance Panel — shown when job is running -->
+          <LoadBalancePanel
+            v-if="job.status === 'running'"
+            class="mb-6"
+          />
+
+          <JobDetail
+            ref="jobDetailRef"
+            :job="job"
+            :tasks="tasks"
+            :tasks-loading="tasksLoading"
+            :tasks-error="tasksError"
+            :refreshing="loading"
+            @cancel-job="handleCancelJob"
+            @refresh="refresh"
+          />
+        </div>
+      </main>
+    </div>
   </div>
 </template>
 
@@ -85,7 +100,12 @@
 import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useJobsStore } from '@/stores/jobsStore'
+import apiClient from '@/api/axios'
 import JobDetail from '@/components/JobDetail.vue'
+import UserSidebar from '@/components/UserSidebar.vue'
+import WorkerActivityPanel from '@/components/WorkerActivityPanel.vue'
+import LoadBalancePanel from '@/components/LoadBalancePanel.vue'
+import JobCompletionBanner from '@/components/JobCompletionBanner.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -93,10 +113,19 @@ const jobsStore = useJobsStore()
 
 const job = ref(null)
 const tasks = ref([])
+const taskStatusCounts = ref(null)
 const initialLoading = ref(true)
 const loading = ref(false)
 const tasksLoading = ref(false)
+const tasksError = ref(null)
 const error = ref(null)
+const jobDetailRef = ref(null)
+
+function scrollToTasks() {
+  if (jobDetailRef.value) {
+    jobDetailRef.value.activeTab = 'tasks'
+  }
+}
 
 let pollingInterval = null
 
@@ -104,16 +133,28 @@ const jobId = computed(() => route.params.id)
 
 onMounted(async () => {
   await loadJobData()
-  
-  // Start polling every 5 seconds
-  pollingInterval = setInterval(async () => {
-    await loadJobData(true)
-  }, 5000)
+
+  // Adaptive polling:
+  // - 2s when running/pending (fast updates)
+  // - Stop entirely when terminal (completed/failed/cancelled)
+  function scheduleNext() {
+    const status = job.value?.status
+    if (!status || ['completed', 'failed', 'cancelled'].includes(status)) {
+      // Job is done — no more polling needed
+      return
+    }
+    const interval = (status === 'running' || status === 'pending') ? 2000 : 5000
+    pollingInterval = setTimeout(async () => {
+      await loadJobData(true)
+      scheduleNext()
+    }, interval)
+  }
+  scheduleNext()
 })
 
 onUnmounted(() => {
   if (pollingInterval) {
-    clearInterval(pollingInterval)
+    clearTimeout(pollingInterval)
   }
 })
 
@@ -121,25 +162,40 @@ async function loadJobData(silent = false) {
   if (!silent) {
     loading.value = true
   }
-  
+
   error.value = null
-  
+
   try {
     // Fetch job details
     const jobData = await jobsStore.fetchJob(jobId.value)
     job.value = jobData
-    
-    // Fetch tasks for this job
-    tasksLoading.value = true
-    const tasksData = await jobsStore.fetchJobTasks(jobId.value)
-    tasks.value = Array.isArray(tasksData) ? tasksData : (tasksData.data || [])
-    
   } catch (err) {
     console.error('Error loading job data:', err)
     error.value = err.response?.data?.message || 'Failed to load job details'
+    job.value = null
   } finally {
     initialLoading.value = false
     loading.value = false
+  }
+
+  if (!job.value) {
+    tasks.value = []
+    tasksError.value = null
+    return
+  }
+
+  // Fetch tasks for this job
+  tasksLoading.value = true
+  tasksError.value = null
+  try {
+    const response = await apiClient.get(`/jobs/${jobId.value}/tasks`)
+    tasks.value = response.data.tasks || []
+    taskStatusCounts.value = response.data.status_counts || null
+  } catch (err) {
+    console.error('Error loading job tasks:', err)
+    tasksError.value = err.response?.data?.message || 'Failed to load job tasks'
+    tasks.value = []
+  } finally {
     tasksLoading.value = false
   }
 }
@@ -152,7 +208,7 @@ async function handleCancelJob(jobId) {
   if (!confirm('Are you sure you want to cancel this job?')) {
     return
   }
-  
+
   try {
     await jobsStore.cancelJob(jobId)
     await loadJobData(true)
@@ -163,6 +219,10 @@ async function handleCancelJob(jobId) {
 }
 
 function goBack() {
-  router.push('/')
+  router.push('/dashboard')
+}
+
+function goToMyJobs() {
+  router.push('/my-jobs')
 }
 </script>

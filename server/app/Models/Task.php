@@ -12,6 +12,9 @@ class Task extends Model
         'job_id',
         'task_index',
         'payload',
+        'input_images',
+        'output_images',
+        'images_processed',
         'status',
         'worker_id',
         'retry_count',
@@ -26,7 +29,10 @@ class Task extends Model
 
     protected $casts = [
         'payload' => 'array',
+        'input_images' => 'array',
+        'output_images' => 'array',
         'task_index' => 'integer',
+        'images_processed' => 'integer',
         'retry_count' => 'integer',
         'max_retries' => 'integer',
         'timeout_seconds' => 'integer',

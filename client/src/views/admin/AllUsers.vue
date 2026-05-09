@@ -126,9 +126,10 @@ async function refreshUsers() {
   loading.value = true
   error.value = null
   
-  const result = await adminStore.fetchAllUsers()
+  const result = await adminStore.fetchAllUsers({ per_page: 100 })
   if (result.success) {
-    users.value = result.data.data || result.data
+    // Response is paginated: { current_page, data: [...], total, ... }
+    users.value = result.data.data || []
   } else {
     error.value = result.error
   }

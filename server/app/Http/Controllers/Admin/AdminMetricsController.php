@@ -7,17 +7,32 @@ use App\Models\SchedulerJob;
 use App\Models\Task;
 use App\Models\Worker;
 use App\Models\User;
+use App\Services\MetricsService;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 class AdminMetricsController extends Controller
 {
+    public function __construct(
+        private MetricsService $metricsService
+    ) {}
+
     /**
      * Get comprehensive system metrics
      */
-    public function index(): JsonResponse
+    public function index(Request $request): JsonResponse
     {
+        // Use the new MetricsService for real-time metrics
+        $realTimeMetrics = $this->metricsService->getRealTimeMetrics();
+        $health = $this->metricsService->getSystemHealth();
+        $activityFeed = $this->metricsService->getActivityFeed(50);
+
+        // Combine with additional admin-specific metrics
         $metrics = [
+            'realtime' => $realTimeMetrics,
+            'health' => $health,
+            'activity_feed' => $activityFeed,
             'system' => $this->getSystemMetrics(),
             'jobs' => $this->getJobMetrics(),
             'tasks' => $this->getTaskMetrics(),
@@ -36,7 +51,7 @@ class AdminMetricsController extends Controller
         return [
             'uptime' => 'N/A', // Could be tracked separately
             'total_jobs_processed' => SchedulerJob::whereIn('status', ['completed', 'failed'])->count(),
-            'total_tasks_processed' => Task::whereIn('status', ['completed', 'failed'])->count(),
+            'total_tasks_processed' => Task::whereIn('status', ['done', 'failed'])->count(),
             'success_rate' => $this->calculateSuccessRate(),
         ];
     }
@@ -72,9 +87,9 @@ class AdminMetricsController extends Controller
             'total' => Task::count(),
             'pending' => Task::where('status', 'pending')->count(),
             'running' => Task::where('status', 'running')->count(),
-            'completed' => Task::where('status', 'completed')->count(),
+            'completed' => Task::where('status', 'done')->count(),
             'failed' => Task::where('status', 'failed')->count(),
-            'average_execution_time' => Task::where('status', 'completed')
+            'average_execution_time' => Task::where('status', 'done')
                 ->whereNotNull('started_at')
                 ->whereNotNull('completed_at')
                 ->selectRaw('AVG(TIMESTAMPDIFF(SECOND, started_at, completed_at)) as avg_time')
@@ -89,7 +104,7 @@ class AdminMetricsController extends Controller
     {
         return [
             'total' => Worker::count(),
-            'active' => Worker::where('status', 'active')->count(),
+            'active' => Worker::whereIn('status', ['idle', 'busy'])->count(),
             'idle' => Worker::where('status', 'idle')->count(),
             'dead' => Worker::where('status', 'dead')->count(),
             'total_tasks_completed' => Worker::sum('tasks_completed'),
@@ -122,8 +137,8 @@ class AdminMetricsController extends Controller
      */
     private function calculateSuccessRate(): float
     {
-        $completed = Task::where('status', 'completed')->count();
-        $total = Task::whereIn('status', ['completed', 'failed'])->count();
+        $completed = Task::where('status', 'done')->count();
+        $total = Task::whereIn('status', ['done', 'failed'])->count();
 
         if ($total === 0) {
             return 0;
@@ -135,11 +150,22 @@ class AdminMetricsController extends Controller
     /**
      * Get historical metrics
      */
-    public function history(): JsonResponse
+    public function history(Request $request): JsonResponse
     {
-        $days = request()->get('days', 7);
+        $period = $request->get('period', 'hour'); // hour, day, week
 
-        $history = DB::table('scheduler_jobs')
+        if (!in_array($period, ['hour', 'day', 'week'])) {
+            return response()->json([
+                'message' => 'Invalid period. Must be: hour, day, or week',
+            ], 400);
+        }
+
+        // Use MetricsService for historical data
+        $history = $this->metricsService->getHistoricalMetrics($period);
+
+        // Also include legacy format for backward compatibility
+        $days = $request->get('days', 7);
+        $legacyHistory = DB::table('scheduler_jobs')
             ->selectRaw('DATE(created_at) as date, COUNT(*) as jobs_created')
             ->where('created_at', '>=', now()->subDays($days))
             ->groupBy('date')
@@ -147,8 +173,36 @@ class AdminMetricsController extends Controller
             ->get();
 
         return response()->json([
-            'period' => $days . ' days',
+            'period' => $period,
             'history' => $history,
+            'legacy_history' => [
+                'period' => $days . ' days',
+                'data' => $legacyHistory,
+            ],
+        ]);
+    }
+
+    /**
+     * Get system health status
+     */
+    public function health(Request $request): JsonResponse
+    {
+        $health = $this->metricsService->getSystemHealth();
+
+        return response()->json($health);
+    }
+
+    /**
+     * Get activity feed
+     */
+    public function activity(Request $request): JsonResponse
+    {
+        $limit = min($request->get('limit', 50), 200);
+        $activityFeed = $this->metricsService->getActivityFeed($limit);
+
+        return response()->json([
+            'activity' => $activityFeed,
+            'count' => count($activityFeed),
         ]);
     }
 }

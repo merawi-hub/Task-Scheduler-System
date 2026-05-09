@@ -180,16 +180,34 @@
                 </tr>
               </thead>
               <tbody class="divide-y divide-gray-100">
-                <tr v-for="job in filteredJobs" :key="job.id" class="hover:bg-gray-50 cursor-pointer" @click="viewJob(job)">
+                <tr v-for="job in filteredJobs" :key="job.id"
+                  :class="[
+                    'hover:bg-gray-50 cursor-pointer transition-colors',
+                    recentlyCompleted.has(job.id) ? 'bg-green-50 ring-2 ring-green-300 ring-inset' : ''
+                  ]"
+                  @click="viewJob(job)">
                   <td class="px-6 py-4 whitespace-nowrap">
                     <div class="flex items-center gap-3">
-                      <div class="w-10 h-10 rounded-lg bg-indigo-100 flex items-center justify-center">
-                        <svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <div :class="[
+                        'w-10 h-10 rounded-lg flex items-center justify-center',
+                        job.status === 'completed' ? 'bg-green-100' : 'bg-indigo-100'
+                      ]">
+                        <svg v-if="job.status === 'completed'" class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                        </svg>
+                        <svg v-else class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                         </svg>
                       </div>
                       <div>
-                        <p class="text-sm font-medium text-gray-900">{{ job.name }}</p>
+                        <div class="flex items-center gap-2">
+                          <p class="text-sm font-medium text-gray-900">{{ job.name }}</p>
+                          <!-- "Just completed" flash badge -->
+                          <span v-if="recentlyCompleted.has(job.id)"
+                            class="px-2 py-0.5 bg-green-500 text-white text-[10px] font-bold rounded-full animate-pulse">
+                            ✓ Just completed!
+                          </span>
+                        </div>
                         <p class="text-xs text-gray-500">#{{ job.id }}</p>
                       </div>
                     </div>
@@ -235,20 +253,17 @@
 
     <!-- Create Job Modal -->
     <CreateJobModal v-if="showCreateModal" @close="showCreateModal = false" @created="handleJobCreated" />
-
-    <!-- Job Detail Modal -->
-    <JobDetailModal v-if="selectedJob" :job="selectedJob" @close="selectedJob = null" @updated="refreshJobs" />
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
-import { useJobsStore } from '@/stores/jobsStore'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { useRouter } from 'vue-router'
 import UserSidebar from '@/components/UserSidebar.vue'
 import CreateJobModal from '@/components/modals/CreateJobModal.vue'
-import JobDetailModal from '@/components/modals/JobDetailModal.vue'
+import api from '@/api'
 
-const jobsStore = useJobsStore()
+const router = useRouter()
 
 const jobs = ref([])
 const loading = ref(false)
@@ -256,7 +271,9 @@ const error = ref(null)
 const filterStatus = ref('')
 const searchQuery = ref('')
 const showCreateModal = ref(false)
-const selectedJob = ref(null)
+// Track newly completed jobs to highlight them
+const recentlyCompleted = ref(new Set())
+let pollTimer = null
 
 const jobStats = computed(() => {
   return {
@@ -289,33 +306,69 @@ const filteredJobs = computed(() => {
 async function refreshJobs() {
   loading.value = true
   error.value = null
-  
+
   try {
-    await jobsStore.fetchJobs()
-    jobs.value = jobsStore.jobs
+    const response = await api.get('/jobs', {
+      params: { sort_by: 'created_at', sort_order: 'desc', per_page: 100 }
+    })
+    const newJobs = response.data.data || response.data || []
+
+    // Detect jobs that just transitioned to completed
+    const prevStatuses = Object.fromEntries(jobs.value.map(j => [j.id, j.status]))
+    newJobs.forEach(j => {
+      if (j.status === 'completed' && prevStatuses[j.id] === 'running') {
+        recentlyCompleted.value.add(j.id)
+        // Remove highlight after 8 seconds
+        setTimeout(() => {
+          recentlyCompleted.value.delete(j.id)
+          recentlyCompleted.value = new Set(recentlyCompleted.value)
+        }, 8000)
+      }
+    })
+
+    jobs.value = newJobs
   } catch (err) {
-    error.value = 'Failed to load jobs'
+    error.value = err.response?.data?.message || 'Failed to load jobs'
   } finally {
     loading.value = false
   }
 }
 
-function handleJobCreated() {
+// Auto-poll every 3s when any job is running, 15s otherwise
+function scheduleNextPoll() {
+  const hasActive = jobs.value.some(j => j.status === 'running' || j.status === 'pending')
+  const interval = hasActive ? 3000 : 15000
+  pollTimer = setTimeout(async () => {
+    await refreshJobs()
+    scheduleNextPoll()
+  }, interval)
+}
+
+onUnmounted(() => {
+  if (pollTimer) clearTimeout(pollTimer)
+})
+
+function handleJobCreated(newJob) {
   showCreateModal.value = false
-  refreshJobs()
+  // Navigate to the new job's detail page if we have an ID
+  if (newJob?.id) {
+    router.push(`/jobs/${newJob.id}`)
+  } else {
+    refreshJobs()
+  }
 }
 
 function viewJob(job) {
-  selectedJob.value = job
+  router.push(`/jobs/${job.id}`)
 }
 
 async function cancelJob(job) {
   if (confirm(`Are you sure you want to cancel "${job.name}"?`)) {
     try {
-      await jobsStore.cancelJob(job.id)
-      refreshJobs()
+      await api.delete(`/jobs/${job.id}`)
+      await refreshJobs()
     } catch (err) {
-      alert('Failed to cancel job')
+      alert(err.response?.data?.message || 'Failed to cancel job')
     }
   }
 }
@@ -364,6 +417,6 @@ function formatDate(dateString) {
 }
 
 onMounted(() => {
-  refreshJobs()
+  refreshJobs().then(() => scheduleNextPoll())
 })
 </script>

@@ -24,15 +24,24 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withSchedule(function (Schedule $schedule): void {
-        // Detect dead workers every minute
-        $schedule->command('workers:detect-dead')
+        // Monitor system health (dead workers and timeouts) every minute
+        $schedule->command('system:monitor-health')
             ->everyMinute()
-            ->withoutOverlapping();
+            ->withoutOverlapping()
+            ->runInBackground();
 
-        // Detect timed-out tasks every 2 minutes
-        $schedule->command('tasks:detect-timeout')
-            ->everyTwoMinutes()
-            ->withoutOverlapping();
+        // Legacy commands (if they exist)
+        if (class_exists(\App\Console\Commands\DetectDeadWorkers::class)) {
+            $schedule->command('workers:detect-dead')
+                ->everyMinute()
+                ->withoutOverlapping();
+        }
+
+        if (class_exists(\App\Console\Commands\DetectTimedOutTasks::class)) {
+            $schedule->command('tasks:detect-timeout')
+                ->everyTwoMinutes()
+                ->withoutOverlapping();
+        }
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //

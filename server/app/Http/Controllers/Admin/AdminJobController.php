@@ -140,4 +140,57 @@ class AdminJobController extends Controller
 
         return response()->json($stats);
     }
+
+    /**
+     * Retry failed tasks for a job (admin only)
+     */
+    public function retryJob(int $id): JsonResponse
+    {
+        $job = SchedulerJob::find($id);
+
+        if (!$job) {
+            return response()->json([
+                'message' => 'Job not found',
+            ], 404);
+        }
+
+        // Find all failed tasks that can be retried
+        $failedTasks = $job->tasks()->where('status', 'failed')->get();
+
+        if ($failedTasks->isEmpty()) {
+            return response()->json([
+                'message' => 'No failed tasks to retry',
+            ], 400);
+        }
+
+        $retriedCount = 0;
+        foreach ($failedTasks as $task) {
+            if ($task->retry_count < $task->max_retries) {
+                $task->update([
+                    'status' => 'pending',
+                    'worker_id' => null,
+                    'retry_count' => $task->retry_count + 1,
+                    'available_after' => now(),
+                    'assigned_at' => null,
+                    'started_at' => null,
+                    'completed_at' => null,
+                ]);
+                $retriedCount++;
+            }
+        }
+
+        // Update job status if it was failed
+        if ($job->status === 'failed' && $retriedCount > 0) {
+            $job->update(['status' => 'running']);
+        }
+
+        // Recalculate job status
+        $this->jobStatusService->recalculate($job);
+
+        return response()->json([
+            'message' => "Retried {$retriedCount} failed task(s)",
+            'retried_count' => $retriedCount,
+            'job' => $job->fresh(),
+        ]);
+    }
 }

@@ -3,44 +3,38 @@ import { ref, computed } from 'vue'
 import apiClient from '@/api/axios'
 
 export const useJobsStore = defineStore('jobs', () => {
-  // State
-  const jobs = ref([])
+  // ── State ──────────────────────────────────────────────────────────────────
+  const jobs       = ref([])
   const currentJob = ref(null)
-  const loading = ref(false)
-  const error = ref(null)
+  const loading    = ref(false)
+  const error      = ref(null)
 
-  // Computed
-  const sortedJobs = computed(() => {
-    return [...jobs.value].sort((a, b) => {
-      return new Date(b.created_at) - new Date(a.created_at)
-    })
-  })
-
-  const jobsByStatus = computed(() => {
-    return (status) => jobs.value.filter(job => job.status === status)
-  })
-
-  const totalJobs = computed(() => jobs.value.length)
-
-  const runningJobs = computed(() => 
-    jobs.value.filter(job => job.status === 'running').length
+  // ── Computed ───────────────────────────────────────────────────────────────
+  const sortedJobs = computed(() =>
+    [...jobs.value].sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
   )
 
-  const completedJobs = computed(() => 
-    jobs.value.filter(job => job.status === 'completed').length
+  const jobsByStatus = computed(() => (status) =>
+    jobs.value.filter(j => j.status === status)
   )
 
-  const failedJobs = computed(() => 
-    jobs.value.filter(job => job.status === 'failed').length
-  )
+  const totalJobs     = computed(() => jobs.value.length)
+  const runningJobs   = computed(() => jobs.value.filter(j => j.status === 'running').length)
+  const completedJobs = computed(() => jobs.value.filter(j => j.status === 'completed').length)
+  const failedJobs    = computed(() => jobs.value.filter(j => j.status === 'failed').length)
 
-  // Actions
+  // ── Actions ────────────────────────────────────────────────────────────────
+
+  /**
+   * Fetch paginated list of user's jobs.
+   * Backend returns: { current_page, data: [...], total, ... }
+   */
   async function fetchJobs(params = {}) {
     loading.value = true
     error.value = null
     try {
       const response = await apiClient.get('/jobs', { params })
-      jobs.value = response.data.data || response.data
+      jobs.value = response.data.data || []
       return response.data
     } catch (err) {
       error.value = err.response?.data?.message || 'Failed to fetch jobs'
@@ -50,20 +44,22 @@ export const useJobsStore = defineStore('jobs', () => {
     }
   }
 
+  /**
+   * Fetch a single job with its tasks.
+   * Backend returns: { job: {...}, progress: float, pending_tasks: int }
+   */
   async function fetchJob(id) {
     loading.value = true
     error.value = null
     try {
       const response = await apiClient.get(`/jobs/${id}`)
-      currentJob.value = response.data.data || response.data
-      
-      // Update the job in the jobs list if it exists
-      const index = jobs.value.findIndex(j => j.id === id)
-      if (index !== -1) {
-        jobs.value[index] = currentJob.value
-      }
-      
-      return currentJob.value
+      const jobData = response.data.job || response.data
+      currentJob.value = jobData
+
+      const idx = jobs.value.findIndex(j => j.id === Number(id))
+      if (idx !== -1) jobs.value[idx] = jobData
+
+      return jobData
     } catch (err) {
       error.value = err.response?.data?.message || 'Failed to fetch job'
       throw err
@@ -72,12 +68,16 @@ export const useJobsStore = defineStore('jobs', () => {
     }
   }
 
+  /**
+   * Submit a new job.
+   * Backend returns: { message, job: {...} }
+   */
   async function submitJob(jobData) {
     loading.value = true
     error.value = null
     try {
       const response = await apiClient.post('/jobs', jobData)
-      const newJob = response.data.data || response.data
+      const newJob = response.data.job || response.data
       jobs.value.unshift(newJob)
       return newJob
     } catch (err) {
@@ -88,35 +88,37 @@ export const useJobsStore = defineStore('jobs', () => {
     }
   }
 
+  /**
+   * Create a job — returns { success, data } shape for modal usage.
+   */
   async function createJob(jobData) {
     loading.value = true
     error.value = null
     try {
       const response = await apiClient.post('/jobs', jobData)
-      const newJob = response.data.data || response.data.job || response.data
+      const newJob = response.data.job || response.data
       jobs.value.unshift(newJob)
       return { success: true, data: newJob }
     } catch (err) {
-      const errorMessage = err.response?.data?.message || 'Failed to create job'
-      error.value = errorMessage
-      return { success: false, error: errorMessage }
+      const msg = err.response?.data?.message || 'Failed to create job'
+      error.value = msg
+      return { success: false, error: msg }
     } finally {
       loading.value = false
     }
   }
 
+  /**
+   * Cancel a job.
+   */
   async function cancelJob(id) {
     loading.value = true
     error.value = null
     try {
       const response = await apiClient.delete(`/jobs/${id}`)
-      const index = jobs.value.findIndex(j => j.id === id)
-      if (index !== -1) {
-        jobs.value[index].status = 'cancelled'
-      }
-      if (currentJob.value?.id === id) {
-        currentJob.value.status = 'cancelled'
-      }
+      const idx = jobs.value.findIndex(j => j.id === Number(id))
+      if (idx !== -1) jobs.value[idx].status = 'cancelled'
+      if (currentJob.value?.id === Number(id)) currentJob.value.status = 'cancelled'
       return response.data
     } catch (err) {
       error.value = err.response?.data?.message || 'Failed to cancel job'
@@ -126,10 +128,16 @@ export const useJobsStore = defineStore('jobs', () => {
     }
   }
 
+  /**
+   * Fetch tasks for a job.
+   * Backend returns: { job_id, job_name, job_type, tasks: [...enriched], status_counts: {...} }
+   * Each task already has record_from, record_to, records_count, operations from the payload.
+   */
   async function fetchJobTasks(jobId) {
     try {
       const response = await apiClient.get(`/jobs/${jobId}/tasks`)
-      return response.data.data || response.data
+      // Return the enriched tasks array
+      return response.data.tasks || response.data.data || response.data
     } catch (err) {
       error.value = err.response?.data?.message || 'Failed to fetch job tasks'
       throw err
@@ -137,22 +145,15 @@ export const useJobsStore = defineStore('jobs', () => {
   }
 
   function updateJob(updatedJob) {
-    const index = jobs.value.findIndex(j => j.id === updatedJob.id)
-    if (index !== -1) {
-      jobs.value[index] = { ...jobs.value[index], ...updatedJob }
-    }
+    const idx = jobs.value.findIndex(j => j.id === updatedJob.id)
+    if (idx !== -1) jobs.value[idx] = { ...jobs.value[idx], ...updatedJob }
     if (currentJob.value?.id === updatedJob.id) {
       currentJob.value = { ...currentJob.value, ...updatedJob }
     }
   }
 
-  function clearCurrentJob() {
-    currentJob.value = null
-  }
-
-  function clearError() {
-    error.value = null
-  }
+  function clearCurrentJob() { currentJob.value = null }
+  function clearError()      { error.value = null }
 
   return {
     // State
@@ -160,7 +161,7 @@ export const useJobsStore = defineStore('jobs', () => {
     currentJob,
     loading,
     error,
-    
+
     // Computed
     sortedJobs,
     jobsByStatus,
@@ -168,7 +169,7 @@ export const useJobsStore = defineStore('jobs', () => {
     runningJobs,
     completedJobs,
     failedJobs,
-    
+
     // Actions
     fetchJobs,
     fetchJob,
@@ -178,6 +179,6 @@ export const useJobsStore = defineStore('jobs', () => {
     fetchJobTasks,
     updateJob,
     clearCurrentJob,
-    clearError
+    clearError,
   }
 })

@@ -22,7 +22,7 @@
               </div>
               <div>
                 <p class="text-sm font-medium text-gray-900">{{ job.name }}</p>
-                <p class="text-xs text-gray-500">John Doe</p>
+                <p class="text-xs text-gray-500">{{ job.user?.name || job.submitted_by || '—' }}</p>
               </div>
             </div>
           </td>
@@ -37,12 +37,14 @@
           <td class="px-6 py-4 whitespace-nowrap">
             <div class="flex items-center gap-2">
               <div class="flex-1 bg-gray-200 rounded-full h-2 max-w-[100px]">
-                <div :class="getProgressColor(job.status)" class="h-2 rounded-full transition-all" :style="{ width: job.progress + '%' }"></div>
+                <div :class="getProgressColor(job.status)" class="h-2 rounded-full transition-all" :style="{ width: computeProgress(job) + '%' }"></div>
               </div>
-              <span class="text-xs font-medium text-gray-600">{{ job.progress }}%</span>
+              <span class="text-xs font-medium text-gray-600">{{ computeProgress(job) }}%</span>
             </div>
           </td>
-          <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ job.tasks }}</td>
+          <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+            {{ job.completed_tasks || 0 }} / {{ job.total_tasks || 0 }}
+          </td>
           <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ formatDate(job.created_at) }}</td>
           <td class="px-6 py-4 whitespace-nowrap text-sm">
             <div class="flex items-center gap-2">
@@ -96,6 +98,14 @@ function getProgressColor(status) {
     pending: 'bg-yellow-500'
   }
   return colors[status] || colors.pending
+}
+
+// Compute progress from actual task counts (API returns completed_tasks/total_tasks, not a progress field)
+function computeProgress(job) {
+  const total = job.total_tasks || 0
+  const completed = job.completed_tasks || 0
+  if (total === 0) return 0
+  return Math.round((completed / total) * 100)
 }
 
 function formatDate(dateString) {

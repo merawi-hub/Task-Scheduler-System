@@ -70,12 +70,18 @@ class WorkerController extends Controller
      */
     public function heartbeat(Request $request, string $key): JsonResponse
     {
-        $worker = Worker::where('worker_key', $key)->first();
+        $worker = $request->get('authenticated_worker');
 
         if (!$worker) {
             return response()->json([
-                'message' => 'Worker not found',
-            ], 404);
+                'message' => 'Worker authentication required',
+            ], 401);
+        }
+
+        if ($worker && $worker->worker_key !== $key) {
+            return response()->json([
+                'message' => 'Worker key does not match authenticated token',
+            ], 403);
         }
 
         $worker->heartbeat();
@@ -88,6 +94,30 @@ class WorkerController extends Controller
         return response()->json([
             'message' => 'Heartbeat received',
             'worker' => $worker->fresh(),
+        ]);
+    }
+
+    /**
+     * Get authenticated worker details
+     */
+    public function me(Request $request): JsonResponse
+    {
+        $worker = $request->get('authenticated_worker');
+
+        if (!$worker) {
+            return response()->json([
+                'message' => 'Worker authentication required',
+            ], 401);
+        }
+
+        $worker->load('currentTask');
+        $worker->is_dead = $worker->isDead();
+        $worker->seconds_since_heartbeat = $worker->last_heartbeat_at
+            ? $worker->last_heartbeat_at->diffInSeconds(now())
+            : null;
+
+        return response()->json([
+            'worker' => $worker,
         ]);
     }
 
@@ -116,7 +146,7 @@ class WorkerController extends Controller
         // Add computed fields
         $workers->each(function ($worker) {
             $worker->is_dead = $worker->isDead();
-            $worker->seconds_since_heartbeat = $worker->last_heartbeat_at 
+            $worker->seconds_since_heartbeat = $worker->last_heartbeat_at
                 ? $worker->last_heartbeat_at->diffInSeconds(now())
                 : null;
         });
@@ -150,7 +180,7 @@ class WorkerController extends Controller
         }
 
         $worker->is_dead = $worker->isDead();
-        $worker->seconds_since_heartbeat = $worker->last_heartbeat_at 
+        $worker->seconds_since_heartbeat = $worker->last_heartbeat_at
             ? $worker->last_heartbeat_at->diffInSeconds(now())
             : null;
 

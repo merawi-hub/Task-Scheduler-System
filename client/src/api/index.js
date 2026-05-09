@@ -1,138 +1,174 @@
 import apiClient from './axios'
 
-// Jobs API
+// ─── Auth API ────────────────────────────────────────────────────────────────
+export const authApi = {
+  login: (email, password) =>
+    apiClient.post('/auth/login', { email, password }),
+
+  register: (name, email, password, passwordConfirmation) =>
+    apiClient.post('/auth/register', {
+      name,
+      email,
+      password,
+      password_confirmation: passwordConfirmation,
+    }),
+
+  logout: () => apiClient.post('/auth/logout'),
+
+  me: () => apiClient.get('/auth/me'),
+
+  updateProfile: (data) => apiClient.put('/auth/profile', data),
+
+  changePassword: (currentPassword, password, passwordConfirmation) =>
+    apiClient.put('/auth/password', {
+      current_password: currentPassword,
+      password,
+      password_confirmation: passwordConfirmation,
+    }),
+}
+
+// ─── Jobs API ─────────────────────────────────────────────────────────────────
 export const jobsApi = {
-  // Get all jobs with optional filters
-  getJobs: async (params = {}) => {
-    const response = await apiClient.get('/jobs', { params })
-    return response.data
-  },
+  getJobs: (params = {}) =>
+    apiClient.get('/jobs', { params }).then((r) => r.data),
 
-  // Get a single job by ID
-  getJob: async (id) => {
-    const response = await apiClient.get(`/jobs/${id}`)
-    return response.data
-  },
+  getJob: (id) =>
+    apiClient.get(`/jobs/${id}`).then((r) => r.data),
 
-  // Submit a new job
-  submitJob: async (jobData) => {
-    const response = await apiClient.post('/jobs', jobData)
-    return response.data
-  },
+  submitJob: (jobData) =>
+    apiClient.post('/jobs', jobData).then((r) => r.data),
 
-  // Cancel a job
-  cancelJob: async (id) => {
-    const response = await apiClient.delete(`/jobs/${id}`)
-    return response.data
-  },
+  cancelJob: (id) =>
+    apiClient.delete(`/jobs/${id}`).then((r) => r.data),
 
-  // Get all tasks for a specific job
-  getJobTasks: async (jobId, params = {}) => {
-    const response = await apiClient.get(`/jobs/${jobId}/tasks`, { params })
-    return response.data
-  }
+  getJobTasks: (jobId, params = {}) =>
+    apiClient.get(`/jobs/${jobId}/tasks`, { params }).then((r) => r.data),
+
+  downloadJob: (jobId) =>
+    apiClient.get(`/jobs/${jobId}/download`).then((r) => r.data),
 }
 
-// Workers API
+// ─── Workers API ──────────────────────────────────────────────────────────────
 export const workersApi = {
-  // Get all workers
-  getWorkers: async () => {
-    const response = await apiClient.get('/workers')
-    return response.data
-  },
+  getWorkers: () =>
+    apiClient.get('/workers').then((r) => r.data),
 
-  // Get a single worker by key
-  getWorker: async (key) => {
-    const response = await apiClient.get(`/workers/${key}`)
-    return response.data
-  },
+  getWorker: (key) =>
+    apiClient.get(`/workers/${key}`).then((r) => r.data),
 
-  // Register a new worker
-  registerWorker: async (workerData) => {
-    const response = await apiClient.post('/workers/register', workerData)
-    return response.data
-  },
+  registerWorker: (workerData) =>
+    apiClient.post('/workers/register', workerData).then((r) => r.data),
 
-  // Send worker heartbeat
-  sendHeartbeat: async (key, data = {}) => {
-    const response = await apiClient.post(`/workers/${key}/heartbeat`, data)
-    return response.data
-  }
+  sendHeartbeat: (key, data = {}) =>
+    apiClient.post(`/workers/${key}/heartbeat`, data).then((r) => r.data),
 }
 
-// Tasks API
+// ─── Tasks API (worker-facing) ────────────────────────────────────────────────
 export const tasksApi = {
-  // Get next available task (for workers)
-  getNextTask: async (workerKey) => {
-    const response = await apiClient.get('/tasks/next', {
-      headers: {
-        'X-Worker-Key': workerKey
-      }
-    })
-    return response.data
-  },
+  getNextTask: (workerToken) =>
+    apiClient.get('/tasks/next', {
+      headers: { 'X-Worker-Token': workerToken },
+    }).then((r) => r.data),
 
-  // Mark task as started
-  startTask: async (taskId, data) => {
-    const response = await apiClient.post(`/tasks/${taskId}/start`, data)
-    return response.data
-  },
+  startTask: (taskId, data) =>
+    apiClient.post(`/tasks/${taskId}/start`, data).then((r) => r.data),
 
-  // Mark task as completed
-  completeTask: async (taskId, data) => {
-    const response = await apiClient.post(`/tasks/${taskId}/complete`, data)
-    return response.data
-  },
+  completeTask: (taskId, data) =>
+    apiClient.post(`/tasks/${taskId}/complete`, data).then((r) => r.data),
 
-  // Mark task as failed
-  failTask: async (taskId, data) => {
-    const response = await apiClient.post(`/tasks/${taskId}/fail`, data)
-    return response.data
-  }
+  failTask: (taskId, data) =>
+    apiClient.post(`/tasks/${taskId}/fail`, data).then((r) => r.data),
 }
 
-// Metrics API
+// ─── Metrics API ──────────────────────────────────────────────────────────────
 export const metricsApi = {
-  // Get current system metrics
-  getMetrics: async () => {
-    const response = await apiClient.get('/metrics')
-    return response.data
-  },
+  getMetrics: () =>
+    apiClient.get('/metrics').then((r) => r.data),
 
-  // Get metrics history for charts
-  getMetricsHistory: async (params = {}) => {
-    const response = await apiClient.get('/metrics/history', { params })
-    return response.data
-  }
+  getMetricsHistory: (params = {}) =>
+    apiClient.get('/metrics/history', { params }).then((r) => r.data),
 }
 
-// Export all APIs as a single object
+// ─── Admin API ────────────────────────────────────────────────────────────────
+export const adminApi = {
+  // Jobs
+  getAllJobs: (params = {}) =>
+    apiClient.get('/admin/jobs', { params }).then((r) => r.data),
+
+  getJob: (id) =>
+    apiClient.get(`/admin/jobs/${id}`).then((r) => r.data),
+
+  getJobStatistics: () =>
+    apiClient.get('/admin/jobs/statistics').then((r) => r.data),
+
+  forceCancelJob: (id) =>
+    apiClient.post(`/admin/jobs/${id}/cancel`).then((r) => r.data),
+
+  retryJob: (id) =>
+    apiClient.post(`/admin/jobs/${id}/retry`).then((r) => r.data),
+
+  deleteJob: (id) =>
+    apiClient.delete(`/admin/jobs/${id}`).then((r) => r.data),
+
+  // Workers
+  getAllWorkers: (params = {}) =>
+    apiClient.get('/admin/workers', { params }).then((r) => r.data),
+
+  getWorkerStatistics: () =>
+    apiClient.get('/admin/workers/statistics').then((r) => r.data),
+
+  markWorkerDead: (key) =>
+    apiClient.post(`/admin/workers/${key}/mark-dead`).then((r) => r.data),
+
+  deleteWorker: (key) =>
+    apiClient.delete(`/admin/workers/${key}`).then((r) => r.data),
+
+  // Users
+  getAllUsers: (params = {}) =>
+    apiClient.get('/admin/users', { params }).then((r) => r.data),
+
+  getUserStatistics: () =>
+    apiClient.get('/admin/users/statistics').then((r) => r.data),
+
+  getUser: (id) =>
+    apiClient.get(`/admin/users/${id}`).then((r) => r.data),
+
+  updateUser: (id, data) =>
+    apiClient.put(`/admin/users/${id}`, data).then((r) => r.data),
+
+  deleteUser: (id) =>
+    apiClient.delete(`/admin/users/${id}`).then((r) => r.data),
+
+  // Metrics
+  getMetrics: () =>
+    apiClient.get('/admin/metrics').then((r) => r.data),
+
+  getMetricsHistory: (period = 'day') =>
+    apiClient.get('/admin/metrics/history', { params: { period } }).then((r) => r.data),
+
+  getHealth: () =>
+    apiClient.get('/admin/metrics/health').then((r) => r.data),
+
+  getActivityFeed: (limit = 50) =>
+    apiClient.get('/admin/metrics/activity', { params: { limit } }).then((r) => r.data),
+}
+
+// ─── Default export — thin wrapper around apiClient ───────────────────────────
 export const api = {
+  auth: authApi,
   jobs: jobsApi,
   workers: workersApi,
   tasks: tasksApi,
   metrics: metricsApi,
+  admin: adminApi,
 
-  // Legacy methods for backward compatibility
-  get: async (endpoint) => {
-    const response = await apiClient.get(endpoint)
-    return response.data
-  },
+  // Raw HTTP methods for one-off calls
+  get: (endpoint, config = {}) => apiClient.get(endpoint, config),
+  post: (endpoint, data, config = {}) => apiClient.post(endpoint, data, config),
+  put: (endpoint, data, config = {}) => apiClient.put(endpoint, data, config),
+  delete: (endpoint, config = {}) => apiClient.delete(endpoint, config),
 
-  post: async (endpoint, data) => {
-    const response = await apiClient.post(endpoint, data)
-    return response.data
-  },
-
-  put: async (endpoint, data) => {
-    const response = await apiClient.put(endpoint, data)
-    return response.data
-  },
-
-  delete: async (endpoint) => {
-    const response = await apiClient.delete(endpoint)
-    return response.data
-  }
+  testConnection: () => apiClient.get('/test').then((r) => r.data),
 }
 
 export default api

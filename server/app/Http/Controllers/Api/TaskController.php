@@ -4,7 +4,6 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Task;
-use App\Models\Worker;
 use App\Services\TaskClaimService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
@@ -17,29 +16,44 @@ class TaskController extends Controller
     ) {}
 
     /**
-     * Claim the next available task (atomic operation)
+     * Claim the next available task (atomic pull operation)
+     * Worker calls this to ask: "Give me a task"
      */
     public function next(Request $request): JsonResponse
     {
-        $workerKey = $request->header('X-Worker-Key');
+        $worker = $request->get('authenticated_worker');
 
-        if (!$workerKey) {
-            return response()->json([
-                'message' => 'X-Worker-Key header is required',
-            ], 401);
+        if (!$worker) {
+            return response()->json(['message' => 'Worker authentication required'], 401);
         }
 
-        $task = $this->claimService->claimNext($workerKey);
+        $task = $this->claimService->claimNext($worker->worker_key);
 
         if (!$task) {
             return response()->json([
-                'message' => 'No tasks available',
+                'message'    => 'No tasks available',
+                'worker_key' => $worker->worker_key,
+                'status'     => 'idle',
             ], 204);
         }
 
         return response()->json([
-            'task' => $task,
+            'message'    => 'Task claimed',
+            'worker_key' => $worker->worker_key,
+            'task'       => $task,
+            // Tell the worker exactly what to do
+            'next_step'  => "POST /api/tasks/{$task->id}/start",
         ]);
+    }
+
+    /**
+     * Get current pull-based activity snapshot (public — for the dashboard)
+     * Shows: which workers are pulling which tasks right now
+     */
+    public function activity(): JsonResponse
+    {
+        $activity = $this->claimService->getCurrentActivity();
+        return response()->json($activity);
     }
 
     /**
@@ -47,17 +61,6 @@ class TaskController extends Controller
      */
     public function start(Request $request, int $id): JsonResponse
     {
-        $validator = Validator::make($request->all(), [
-            'worker_key' => 'required|string',
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json([
-                'message' => 'Validation failed',
-                'errors' => $validator->errors(),
-            ], 422);
-        }
-
         $task = Task::find($id);
         if (!$task) {
             return response()->json([
@@ -65,11 +68,11 @@ class TaskController extends Controller
             ], 404);
         }
 
-        $worker = Worker::where('worker_key', $request->worker_key)->first();
+        $worker = $request->get('authenticated_worker');
         if (!$worker) {
             return response()->json([
-                'message' => 'Worker not found',
-            ], 404);
+                'message' => 'Worker authentication required',
+            ], 401);
         }
 
         $success = $this->claimService->markStarted($task, $worker);
@@ -92,19 +95,6 @@ class TaskController extends Controller
      */
     public function complete(Request $request, int $id): JsonResponse
     {
-        $validator = Validator::make($request->all(), [
-            'worker_key' => 'required|string',
-            'result' => 'nullable|array',
-            'duration_ms' => 'nullable|integer',
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json([
-                'message' => 'Validation failed',
-                'errors' => $validator->errors(),
-            ], 422);
-        }
-
         $task = Task::find($id);
         if (!$task) {
             return response()->json([
@@ -112,14 +102,17 @@ class TaskController extends Controller
             ], 404);
         }
 
-        $worker = Worker::where('worker_key', $request->worker_key)->first();
+        $worker = $request->get('authenticated_worker');
         if (!$worker) {
             return response()->json([
-                'message' => 'Worker not found',
-            ], 404);
+                'message' => 'Worker authentication required',
+            ], 401);
         }
 
-        $result = $request->get('result');
+        $result = $request->get('result', []);
+        if (!is_array($result)) {
+            $result = [];
+        }
         if ($request->has('duration_ms')) {
             $result['duration_ms'] = $request->duration_ms;
         }
@@ -144,8 +137,21 @@ class TaskController extends Controller
      */
     public function fail(Request $request, int $id): JsonResponse
     {
+        $task = Task::find($id);
+        if (!$task) {
+            return response()->json([
+                'message' => 'Task not found',
+            ], 404);
+        }
+
+        $worker = $request->get('authenticated_worker');
+        if (!$worker) {
+            return response()->json([
+                'message' => 'Worker authentication required',
+            ], 401);
+        }
+
         $validator = Validator::make($request->all(), [
-            'worker_key' => 'required|string',
             'reason' => 'required|string',
         ]);
 
@@ -154,20 +160,6 @@ class TaskController extends Controller
                 'message' => 'Validation failed',
                 'errors' => $validator->errors(),
             ], 422);
-        }
-
-        $task = Task::find($id);
-        if (!$task) {
-            return response()->json([
-                'message' => 'Task not found',
-            ], 404);
-        }
-
-        $worker = Worker::where('worker_key', $request->worker_key)->first();
-        if (!$worker) {
-            return response()->json([
-                'message' => 'Worker not found',
-            ], 404);
         }
 
         $success = $this->claimService->markFailed($task, $worker, $request->reason);
@@ -182,6 +174,54 @@ class TaskController extends Controller
             'message' => 'Task marked as failed',
             'task' => $task->fresh(),
             'will_retry' => $task->status === 'pending',
+        ]);
+    }
+
+    /**
+     * Update task with processed images
+     */
+    public function updateImages(Request $request, int $id): JsonResponse
+    {
+        $task = Task::find($id);
+        if (!$task) {
+            return response()->json([
+                'message' => 'Task not found',
+            ], 404);
+        }
+
+        $worker = $request->get('authenticated_worker');
+        if (!$worker) {
+            return response()->json([
+                'message' => 'Worker authentication required',
+            ], 401);
+        }
+
+        if ($task->worker_id !== $worker->id) {
+            return response()->json([
+                'message' => 'Unauthorized',
+            ], 403);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'output_images' => 'required|array',
+            'images_processed' => 'required|integer',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'message' => 'Validation failed',
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        $task->update([
+            'output_images' => $request->output_images,
+            'images_processed' => $request->images_processed,
+        ]);
+
+        return response()->json([
+            'message' => 'Task images updated',
+            'task' => $task->fresh(),
         ]);
     }
 }

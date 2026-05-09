@@ -40,6 +40,8 @@ Route::prefix('auth')->group(function () {
     Route::middleware('auth:sanctum')->group(function () {
         Route::post('/logout', [AuthController::class, 'logout']);
         Route::get('/me', [AuthController::class, 'me']);
+        Route::put('/profile', [AuthController::class, 'updateProfile']);
+        Route::put('/password', [AuthController::class, 'changePassword']);
     });
 });
 
@@ -49,11 +51,15 @@ Route::prefix('auth')->group(function () {
 |--------------------------------------------------------------------------
 */
 Route::middleware('auth:sanctum')->prefix('jobs')->group(function () {
-    Route::get('/', [JobController::class, 'index']); // Only user's jobs
-    Route::post('/', [JobController::class, 'store']); // Submit new job
-    Route::get('/{id}', [JobController::class, 'show']); // View own job
-    Route::get('/{id}/tasks', [JobController::class, 'tasks']); // View own job's tasks
-    Route::delete('/{id}', [JobController::class, 'destroy']); // Cancel own job
+    Route::get('/', [JobController::class, 'index']);
+    Route::post('/', [JobController::class, 'store']);
+    Route::get('/{id}', [JobController::class, 'show']);
+    Route::get('/{id}/status', [JobController::class, 'statusPoll']);
+    Route::get('/{id}/retry-stats', [JobController::class, 'retryStats']);
+    Route::get('/{id}/completion', [JobController::class, 'completionSummary']); // Final summary
+    Route::get('/{id}/tasks', [JobController::class, 'tasks']);
+    Route::get('/{id}/download', [JobController::class, 'download']);
+    Route::delete('/{id}', [JobController::class, 'destroy']);
 });
 
 /*
@@ -70,7 +76,18 @@ Route::middleware('worker.auth')->group(function () {
     Route::post('/tasks/{id}/start', [TaskController::class, 'start']);
     Route::post('/tasks/{id}/complete', [TaskController::class, 'complete']);
     Route::post('/tasks/{id}/fail', [TaskController::class, 'fail']);
+    Route::post('/tasks/{id}/update-images', [TaskController::class, 'updateImages']);
     Route::post('/workers/{key}/heartbeat', [WorkerController::class, 'heartbeat']);
+    Route::get('/workers/{key}/me', [WorkerController::class, 'me']);
+});
+
+// Pull-based activity snapshot — authenticated users can see who is pulling what
+Route::middleware('auth:sanctum')->get('/tasks/activity', [TaskController::class, 'activity']);
+
+// Worker list — requires user auth (not public)
+Route::middleware('auth:sanctum')->group(function () {
+    Route::get('/workers', [WorkerController::class, 'index']);
+    Route::get('/workers/{key}', [WorkerController::class, 'show']);
 });
 
 /*
@@ -84,11 +101,13 @@ Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function ()
     Route::get('/jobs/statistics', [AdminJobController::class, 'statistics']);
     Route::get('/jobs/{id}', [AdminJobController::class, 'show']);
     Route::post('/jobs/{id}/cancel', [AdminJobController::class, 'forceCancel']);
+    Route::post('/jobs/{id}/retry', [AdminJobController::class, 'retryJob']);
     Route::delete('/jobs/{id}', [AdminJobController::class, 'destroy']);
     
     // Worker Management
     Route::get('/workers', [AdminWorkerController::class, 'index']); // All workers
     Route::get('/workers/statistics', [AdminWorkerController::class, 'statistics']);
+    Route::get('/workers/fault-tolerance', [AdminWorkerController::class, 'faultTolerance']); // Heartbeat + recovery data
     Route::get('/workers/{key}', [AdminWorkerController::class, 'show']);
     Route::post('/workers/{key}/mark-dead', [AdminWorkerController::class, 'markDead']);
     Route::delete('/workers/{key}', [AdminWorkerController::class, 'destroy']);
@@ -103,6 +122,11 @@ Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function ()
     // System Metrics
     Route::get('/metrics', [AdminMetricsController::class, 'index']);
     Route::get('/metrics/history', [AdminMetricsController::class, 'history']);
+    Route::get('/metrics/health', [AdminMetricsController::class, 'health']);
+    Route::get('/metrics/activity', [AdminMetricsController::class, 'activity']);
+    
+    // Task Logs
+    Route::get('/logs', [AdminMetricsController::class, 'activity']); // Alias for activity feed
 });
 
 /*

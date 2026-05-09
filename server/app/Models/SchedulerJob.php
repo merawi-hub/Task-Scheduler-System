@@ -13,6 +13,10 @@ class SchedulerJob extends Model
         'name',
         'description',
         'type',
+        'input_files',
+        'output_files',
+        'operations',
+        'storage_path',
         'status',
         'total_tasks',
         'completed_tasks',
@@ -25,6 +29,9 @@ class SchedulerJob extends Model
 
     protected $casts = [
         'user_id' => 'integer',
+        'input_files' => 'array',
+        'output_files' => 'array',
+        'operations' => 'array',
         'total_tasks' => 'integer',
         'completed_tasks' => 'integer',
         'failed_tasks' => 'integer',

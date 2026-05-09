@@ -172,9 +172,10 @@
                     <td class="px-6 py-4 whitespace-nowrap">
                       <div class="flex items-center gap-2">
                         <div class="flex-1 bg-gray-200 rounded-full h-2 max-w-[100px]">
-                          <div :class="getProgressColor(job.status)" class="h-2 rounded-full transition-all" :style="{ width: job.progress + '%' }"></div>
+                          <div :class="getProgressColor(job.status)" class="h-2 rounded-full transition-all"
+                            :style="{ width: computeJobProgress(job) + '%' }"></div>
                         </div>
-                        <span class="text-xs font-medium text-gray-600">{{ job.progress }}%</span>
+                        <span class="text-xs font-medium text-gray-600">{{ computeJobProgress(job) }}%</span>
                       </div>
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ job.completed_tasks }}/{{ job.total_tasks }}</td>
@@ -227,39 +228,77 @@ const stats = computed(() => {
   const metrics = adminStore.systemMetrics
   if (!metrics) {
     return {
-      totalJobs: 0,
-      jobsChange: 0,
-      completed: 0,
-      completedChange: 0,
-      running: 0,
-      runningChange: 0,
-      failed: 0,
-      failedChange: 0
+      totalJobs: 0, jobsChange: 0,
+      completed: 0, completedChange: 0,
+      running: 0, runningChange: 0,
+      failed: 0, failedChange: 0
     }
   }
 
+  // Admin metrics structure: { realtime: { jobs, tasks, workers }, jobs, tasks, workers }
+  const jobs = metrics.jobs || metrics.realtime?.jobs || {}
+  const history = adminStore.metricsHistory?.legacy_history?.data || []
+  const taskHistory = adminStore.metricsHistory?.history?.tasks_completed || []
+  const taskFailedHistory = adminStore.metricsHistory?.history?.tasks_failed || []
+
   return {
-    totalJobs: metrics.jobs?.total || 0,
-    jobsChange: 12.5, // TODO: Calculate from historical data
-    completed: metrics.jobs?.completed || 0,
-    completedChange: 8.2, // TODO: Calculate from historical data
-    running: metrics.jobs?.running || 0,
-    runningChange: 5.1, // TODO: Calculate from historical data
-    failed: metrics.jobs?.failed || 0,
-    failedChange: -2.4 // TODO: Calculate from historical data
+    totalJobs: jobs.total || 0,
+    jobsChange: calcChangeFromSeries(history.map(item => item.jobs_created || 0)),
+    completed: jobs.completed || 0,
+    completedChange: calcChangeFromSeries(taskHistory.map(item => item.count || 0)),
+    running: jobs.running || 0,
+    runningChange: 0,
+    failed: jobs.failed || 0,
+    failedChange: calcChangeFromSeries(taskFailedHistory.map(item => item.count || 0))
   }
 })
 
 // Jobs chart data
 const jobsChartData = computed(() => {
-  // TODO: Fetch historical data from API
-  // For now, using mock data
+  const history = adminStore.metricsHistory?.history
+  if (!history?.intervals) {
+    return {
+      labels: [],
+      datasets: [
+        {
+          label: 'Completed',
+          data: [],
+          borderColor: '#6366f1',
+          backgroundColor: 'rgba(99, 102, 241, 0.1)',
+          tension: 0.4,
+          fill: true
+        },
+        {
+          label: 'Running',
+          data: [],
+          borderColor: '#10b981',
+          backgroundColor: 'rgba(16, 185, 129, 0.1)',
+          tension: 0.4,
+          fill: true
+        },
+        {
+          label: 'Failed',
+          data: [],
+          borderColor: '#ef4444',
+          backgroundColor: 'rgba(239, 68, 68, 0.1)',
+          tension: 0.4,
+          fill: true
+        }
+      ]
+    }
+  }
+
+  const labels = history.intervals.map((timestamp) => formatIntervalLabel(timestamp))
+  const completedSeries = history.tasks_completed.map(item => item.count || 0)
+  const failedSeries = history.tasks_failed.map(item => item.count || 0)
+  const runningBaseline = new Array(labels.length).fill(adminStore.systemMetrics?.jobs?.running || 0)
+
   return {
-    labels: ['May 7', 'May 8', 'May 9', 'May 10', 'May 11', 'May 12', 'May 13'],
+    labels,
     datasets: [
       {
         label: 'Completed',
-        data: [50, 55, 75, 85, 70, 80, stats.value.completed],
+        data: completedSeries,
         borderColor: '#6366f1',
         backgroundColor: 'rgba(99, 102, 241, 0.1)',
         tension: 0.4,
@@ -267,7 +306,7 @@ const jobsChartData = computed(() => {
       },
       {
         label: 'Running',
-        data: [20, 25, 30, 35, 30, 40, stats.value.running],
+        data: runningBaseline,
         borderColor: '#10b981',
         backgroundColor: 'rgba(16, 185, 129, 0.1)',
         tension: 0.4,
@@ -275,7 +314,7 @@ const jobsChartData = computed(() => {
       },
       {
         label: 'Failed',
-        data: [5, 8, 10, 12, 10, 15, stats.value.failed],
+        data: failedSeries,
         borderColor: '#ef4444',
         backgroundColor: 'rgba(239, 68, 68, 0.1)',
         tension: 0.4,
@@ -288,25 +327,16 @@ const jobsChartData = computed(() => {
 // Tasks chart data from real metrics
 const tasksChartData = computed(() => {
   const metrics = adminStore.systemMetrics
-  if (!metrics?.tasks) {
-    return {
-      labels: ['Completed', 'Running', 'Failed', 'Pending'],
-      datasets: [{
-        data: [0, 0, 0, 0],
-        backgroundColor: ['#10b981', '#f59e0b', '#ef4444', '#6b7280'],
-        borderWidth: 0
-      }]
-    }
-  }
-
+  // Admin metrics: { tasks: {...} } or { realtime: { tasks: {...} } }
+  const tasks = metrics?.tasks || metrics?.realtime?.tasks || {}
   return {
     labels: ['Completed', 'Running', 'Failed', 'Pending'],
     datasets: [{
       data: [
-        metrics.tasks.completed || 0,
-        metrics.tasks.running || 0,
-        metrics.tasks.failed || 0,
-        metrics.tasks.pending || 0
+        tasks.done || tasks.completed || 0,
+        tasks.running || 0,
+        tasks.failed || 0,
+        tasks.pending || 0
       ],
       backgroundColor: ['#10b981', '#f59e0b', '#ef4444', '#6b7280'],
       borderWidth: 0
@@ -314,17 +344,9 @@ const tasksChartData = computed(() => {
   }
 })
 
-// Recent jobs from store
+// Recent jobs from store — pass raw job objects so computeJobProgress can work on them
 const recentJobs = computed(() => {
-  return adminStore.allJobs.slice(0, 5).map(job => ({
-    id: job.id,
-    name: job.name,
-    status: job.status,
-    progress: job.progress || 0,
-    completed_tasks: job.completed_tasks || 0,
-    total_tasks: job.total_tasks || 0,
-    created_at: job.created_at
-  }))
+  return adminStore.allJobs.slice(0, 5)
 })
 
 // System health computed from metrics
@@ -340,21 +362,24 @@ const systemHealth = computed(() => {
     ]
   }
 
-  const activeWorkers = metrics.workers?.active || 0
-  const totalWorkers = metrics.workers?.total || 0
-  const runningJobs = metrics.jobs?.running || 0
+  // Support both { workers: {...} } and { realtime: { workers: {...} } }
+  const workers = metrics.workers || metrics.realtime?.workers || {}
+  const jobs    = metrics.jobs    || metrics.realtime?.jobs    || {}
+  const activeWorkers = workers.active || (workers.idle || 0) + (workers.busy || 0)
+  const totalWorkers  = workers.total  || 0
+  const runningJobs   = jobs.running   || 0
 
   return [
     { name: 'Master Node', status: 'Healthy', detail: null },
-    { 
-      name: 'Worker Nodes', 
-      status: activeWorkers > 0 ? 'Healthy' : 'Warning', 
-      detail: `${activeWorkers}/${totalWorkers} Online` 
+    {
+      name: 'Worker Nodes',
+      status: activeWorkers > 0 ? 'Healthy' : 'Warning',
+      detail: `${activeWorkers}/${totalWorkers} Online`
     },
-    { 
-      name: 'Queues', 
-      status: 'Healthy', 
-      detail: `${runningJobs} Active` 
+    {
+      name: 'Queues',
+      status: 'Healthy',
+      detail: `${runningJobs} Active`
     },
     { name: 'Database', status: 'Healthy', detail: null },
     { name: 'Redis', status: 'Healthy', detail: null }
@@ -382,17 +407,41 @@ function getProgressColor(status) {
   return colors[status] || colors.pending
 }
 
+// Compute progress from actual task counts (API returns completed_tasks/total_tasks)
+function computeJobProgress(job) {
+  const total = job.total_tasks || 0
+  const completed = job.completed_tasks || 0
+  if (total === 0) return 0
+  return Math.round((completed / total) * 100)
+}
+
 function formatDate(dateString) {
   const date = new Date(dateString)
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) + ' ' +
          date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
 }
 
+function formatIntervalLabel(timestamp) {
+  const date = new Date(timestamp)
+  return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+}
+
+function calcChangeFromSeries(series) {
+  if (!series || series.length < 2) return 0
+  const latest = series[series.length - 1] || 0
+  const previous = series[series.length - 2] || 0
+  if (previous === 0) return latest > 0 ? 100 : 0
+  return Math.round(((latest - previous) / previous) * 100)
+}
+
 async function refreshData() {
   loading.value = true
   try {
     // Fetch dashboard data (metrics + recent jobs)
-    await adminStore.fetchDashboardData({ limit: 10 })
+    await Promise.all([
+      adminStore.fetchDashboardData({ limit: 10 }),
+      adminStore.fetchMetricsHistory('day')
+    ])
   } catch (error) {
     console.error('Failed to refresh dashboard data:', error)
   } finally {

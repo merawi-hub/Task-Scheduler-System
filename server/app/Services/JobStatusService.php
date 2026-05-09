@@ -53,6 +53,34 @@ class JobStatusService
                 }
 
                 $job->update($updates);
+
+                // Log the job completion to the activity feed
+                if ($newStatus === 'completed') {
+                    \App\Models\TaskLog::info(
+                        // Use the last completed task's ID as anchor
+                        $job->tasks()->where('status', 'done')->latest('completed_at')->value('id') ?? 0,
+                        "Job \"{$job->name}\" completed — all {$job->total_tasks} tasks done",
+                        null,
+                        [
+                            'job_id'          => $job->id,
+                            'job_name'        => $job->name,
+                            'total_tasks'     => $job->total_tasks,
+                            'completed_tasks' => $completedCount,
+                            'completed_at'    => now()->toIso8601String(),
+                        ]
+                    );
+                } elseif ($newStatus === 'failed') {
+                    \App\Models\TaskLog::error(
+                        $job->tasks()->where('status', 'failed')->latest('completed_at')->value('id') ?? 0,
+                        "Job \"{$job->name}\" failed — {$failedCount} task(s) permanently failed",
+                        null,
+                        [
+                            'job_id'       => $job->id,
+                            'job_name'     => $job->name,
+                            'failed_tasks' => $failedCount,
+                        ]
+                    );
+                }
             }
         });
     }

@@ -4,11 +4,20 @@ import Login from '@/views/Login.vue'
 import Register from '@/views/Register.vue'
 import UserDashboard from '@/views/UserDashboard.vue'
 import MyJobs from '@/views/MyJobs.vue'
+import SubmitJob from '@/views/SubmitJob.vue'
+import JobMonitoring from '@/views/JobMonitoring.vue'
 import JobDetailView from '@/views/JobDetailView.vue'
+import SystemFlowView from '@/views/SystemFlowView.vue'
+import Settings from '@/views/Settings.vue'
+import Notifications from '@/views/Notifications.vue'
+import Profile from '@/views/Profile.vue'
+import HelpCenter from '@/views/HelpCenter.vue'
 import AdminDashboard from '@/views/admin/AdminDashboard.vue'
 import AllJobs from '@/views/admin/AllJobs.vue'
 import AllUsers from '@/views/admin/AllUsers.vue'
 import WorkerManagement from '@/views/admin/WorkerManagement.vue'
+import AdminMonitoring from '@/views/admin/AdminMonitoring.vue'
+import AdminLogs from '@/views/admin/AdminLogs.vue'
 import AdminLayout from '@/components/AdminLayout.vue'
 
 const router = createRouter({
@@ -46,6 +55,15 @@ const router = createRouter({
       }
     },
     {
+      path: '/submit-job',
+      name: 'submit-job',
+      component: SubmitJob,
+      meta: {
+        title: 'Submit Job - Task Scheduler',
+        requiresAuth: true
+      }
+    },
+    {
       path: '/my-jobs',
       name: 'my-jobs',
       component: MyJobs,
@@ -62,6 +80,74 @@ const router = createRouter({
         title: 'Job Details - Task Scheduler',
         requiresAuth: true
       }
+    },
+    {
+      path: '/jobs/:id/monitoring',
+      name: 'job-monitoring',
+      component: JobMonitoring,
+      meta: {
+        title: 'Job Monitoring - Task Scheduler',
+        requiresAuth: true
+      }
+    },
+    {
+      path: '/job-monitoring',
+      name: 'job-monitoring-list',
+      component: JobMonitoring,
+      meta: {
+        title: 'Job Monitoring - Task Scheduler',
+        requiresAuth: true
+      }
+    },
+    {
+      path: '/notifications',
+      name: 'notifications',
+      component: Notifications,
+      meta: {
+        title: 'Notifications - Task Scheduler',
+        requiresAuth: true
+      }
+    },
+    {
+      path: '/profile',
+      name: 'profile',
+      component: Profile,
+      meta: {
+        title: 'Profile - Task Scheduler',
+        requiresAuth: true
+      }
+    },
+    {
+      path: '/help',
+      name: 'help',
+      component: HelpCenter,
+      meta: {
+        title: 'Help Center - Task Scheduler',
+        requiresAuth: true
+      }
+    },
+    {
+      path: '/settings',
+      name: 'settings',
+      component: Settings,
+      meta: {
+        title: 'Settings - Task Scheduler',
+        requiresAuth: true
+      }
+    },
+    {
+      path: '/system-flow',
+      name: 'system-flow',
+      component: SystemFlowView,
+      meta: {
+        title: 'System Flow - Task Scheduler',
+        requiresAuth: true
+      }
+    },
+    // Legacy route for backward compatibility
+    {
+      path: '/job-detail/:id',
+      redirect: to => `/jobs/${to.params.id}`
     },
     {
       path: '/admin',
@@ -102,6 +188,47 @@ const router = createRouter({
           meta: {
             title: 'Worker Management - Admin - Task Scheduler'
           }
+        },
+        {
+          path: 'monitoring',
+          name: 'admin-monitoring',
+          component: AdminMonitoring,
+          meta: {
+            title: 'Monitoring - Admin - Task Scheduler'
+          }
+        },
+        {
+          path: 'logs',
+          name: 'admin-logs',
+          component: AdminLogs,
+          meta: {
+            title: 'Task Logs - Admin - Task Scheduler'
+          }
+        },
+        // Alias routes for sidebar items that map to existing views
+        {
+          path: 'tasks',
+          name: 'admin-tasks',
+          component: AllJobs,
+          meta: { title: 'Tasks - Admin - Task Scheduler' }
+        },
+        {
+          path: 'queues',
+          name: 'admin-queues',
+          component: AdminMonitoring,
+          meta: { title: 'Queues - Admin - Task Scheduler' }
+        },
+        {
+          path: 'schedulers',
+          name: 'admin-schedulers',
+          component: AdminMonitoring,
+          meta: { title: 'Schedulers - Admin - Task Scheduler' }
+        },
+        {
+          path: 'settings',
+          name: 'admin-settings',
+          component: AllUsers,
+          meta: { title: 'Settings - Admin - Task Scheduler' }
         }
       ]
     },
@@ -115,17 +242,17 @@ const router = createRouter({
 // Authentication guard
 router.beforeEach(async (to, from) => {
   const authStore = useAuthStore()
-  
+
   // Update page title
   document.title = to.meta.title || 'Task Scheduler'
-  
+
   // If route requires authentication
   if (to.meta.requiresAuth) {
     if (!authStore.isAuthenticated) {
       // Not logged in, redirect to login
       return '/login'
     }
-    
+
     // If user data not loaded, fetch it
     if (!authStore.user) {
       const result = await authStore.fetchUser()
@@ -134,14 +261,14 @@ router.beforeEach(async (to, from) => {
         return '/login'
       }
     }
-    
+
     // Check admin requirement
     if (to.meta.requiresAdmin && !authStore.isAdmin) {
       // Not an admin, redirect to user dashboard
       return '/dashboard'
     }
   }
-  
+
   // If route requires guest (login/register pages)
   if (to.meta.requiresGuest && authStore.isAuthenticated) {
     // Already logged in, redirect based on role
@@ -151,7 +278,7 @@ router.beforeEach(async (to, from) => {
       return '/dashboard'
     }
   }
-  
+
   // Allow navigation
   return true
 })

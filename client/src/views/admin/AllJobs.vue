@@ -85,6 +85,13 @@
                     Cancel
                   </button>
                   <button
+                    v-if="job.status === 'failed'"
+                    @click="retryJob(job.id)"
+                    class="text-green-600 hover:text-green-900 font-medium"
+                  >
+                    Retry
+                  </button>
+                  <button
                     @click="deleteJob(job.id)"
                     class="text-red-600 hover:text-red-900 font-medium"
                   >
@@ -130,14 +137,27 @@ async function refreshJobs() {
   loading.value = true
   error.value = null
   
-  const result = await adminStore.fetchAllJobs()
+  const result = await adminStore.fetchAllJobs({ per_page: 100, sort_by: 'created_at', sort_order: 'desc' })
   if (result.success) {
-    jobs.value = result.data.data || result.data
+    // Response is paginated: { current_page, data: [...], total, ... }
+    jobs.value = result.data.data || []
   } else {
     error.value = result.error
   }
   
   loading.value = false
+}
+
+async function retryJob(jobId) {
+  if (!confirm('Retry all failed tasks for this job?')) return
+  
+  try {
+    await import('@/api').then(m => m.default.post(`/admin/jobs/${jobId}/retry`))
+    alert('Failed tasks queued for retry')
+    refreshJobs()
+  } catch (err) {
+    alert('Failed to retry job: ' + (err.response?.data?.message || err.message))
+  }
 }
 
 async function cancelJob(jobId) {

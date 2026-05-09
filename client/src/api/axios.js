@@ -9,32 +9,31 @@ const apiClient = axios.create({
   }
 })
 
-// Request interceptor
+// Request interceptor — attach Bearer token on every request
 apiClient.interceptors.request.use(
   (config) => {
-    // You can add auth token here if needed
-    // const token = localStorage.getItem('token')
-    // if (token) {
-    //   config.headers.Authorization = `Bearer ${token}`
-    // }
+    // Read token directly from localStorage so this works before Pinia is ready
+    const token = localStorage.getItem('auth_token')
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`
+    }
     return config
   },
-  (error) => {
-    return Promise.reject(error)
-  }
+  (error) => Promise.reject(error)
 )
 
 // Response interceptor
 apiClient.interceptors.response.use(
-  (response) => {
-    return response
-  },
+  (response) => response,
   (error) => {
     if (error.response) {
-      // Handle specific error codes
       switch (error.response.status) {
         case 401:
-          console.error('Unauthorized access')
+          // Token expired or invalid — clear auth and redirect to login
+          localStorage.removeItem('auth_token')
+          if (window.location.pathname !== '/login') {
+            window.location.href = '/login'
+          }
           break
         case 403:
           console.error('Forbidden access')
@@ -43,19 +42,14 @@ apiClient.interceptors.response.use(
           console.error('Resource not found')
           break
         case 422:
-          console.error('Validation Error (422):', error.response.data)
-          console.error('Validation Errors:', error.response.data.errors)
+          // Validation errors — let the caller handle them
           break
         case 500:
-          console.error('Server error')
+          console.error('Server error:', error.response.data)
           break
-        default:
-          console.error('An error occurred:', error.response.data)
       }
     } else if (error.request) {
-      console.error('No response received:', error.request)
-    } else {
-      console.error('Error setting up request:', error.message)
+      console.error('No response received — server may be down')
     }
     return Promise.reject(error)
   }

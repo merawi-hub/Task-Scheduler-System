@@ -3,54 +3,46 @@ import { ref, computed } from 'vue'
 import apiClient from '@/api/axios'
 
 export const useWorkersStore = defineStore('workers', () => {
-  // State
+  // ── State ──────────────────────────────────────────────────────────────────
   const workers = ref([])
   const loading = ref(false)
-  const error = ref(null)
+  const error   = ref(null)
 
-  // Computed
-  const totalWorkers = computed(() => workers.value.length)
+  // ── Computed ───────────────────────────────────────────────────────────────
+  const totalWorkers  = computed(() => workers.value.length)
+  const activeWorkers = computed(() => workers.value.filter(w => w.status === 'idle' || w.status === 'busy').length)
+  const busyWorkers   = computed(() => workers.value.filter(w => w.status === 'busy').length)
+  const idleWorkers   = computed(() => workers.value.filter(w => w.status === 'idle').length)
+  const deadWorkers   = computed(() => workers.value.filter(w => w.status === 'dead').length)
 
-  const activeWorkers = computed(() => 
-    workers.value.filter(w => w.status === 'idle' || w.status === 'busy').length
+  const workersByStatus = computed(() => (status) =>
+    workers.value.filter(w => w.status === status)
   )
 
-  const busyWorkers = computed(() => 
-    workers.value.filter(w => w.status === 'busy').length
-  )
-
-  const idleWorkers = computed(() => 
-    workers.value.filter(w => w.status === 'idle').length
-  )
-
-  const deadWorkers = computed(() => 
-    workers.value.filter(w => w.status === 'dead').length
-  )
-
-  const workersByStatus = computed(() => {
-    return (status) => workers.value.filter(w => w.status === status)
-  })
-
-  const totalTasksCompleted = computed(() => 
+  const totalTasksCompleted = computed(() =>
     workers.value.reduce((sum, w) => sum + (w.tasks_completed || 0), 0)
   )
-
-  const totalTasksFailed = computed(() => 
+  const totalTasksFailed = computed(() =>
     workers.value.reduce((sum, w) => sum + (w.tasks_failed || 0), 0)
   )
-
   const workerUtilization = computed(() => {
     if (totalWorkers.value === 0) return 0
     return Math.round((busyWorkers.value / totalWorkers.value) * 100)
   })
 
-  // Actions
+  // ── Actions ────────────────────────────────────────────────────────────────
+
+  /**
+   * Fetch all workers.
+   * Backend returns: { workers: [...], summary: { total, idle, busy, dead } }
+   */
   async function fetchWorkers() {
     loading.value = true
     error.value = null
     try {
       const response = await apiClient.get('/workers')
-      workers.value = response.data.data || response.data
+      // Handle both { workers: [...] } and flat array responses
+      workers.value = response.data.workers || response.data.data || response.data || []
       return response.data
     } catch (err) {
       error.value = err.response?.data?.message || 'Failed to fetch workers'
@@ -65,16 +57,15 @@ export const useWorkersStore = defineStore('workers', () => {
     error.value = null
     try {
       const response = await apiClient.get(`/workers/${key}`)
-      const worker = response.data.data || response.data
-      
-      // Update the worker in the workers list if it exists
-      const index = workers.value.findIndex(w => w.worker_key === key)
-      if (index !== -1) {
-        workers.value[index] = worker
+      const worker = response.data.worker || response.data
+
+      const idx = workers.value.findIndex(w => w.worker_key === key)
+      if (idx !== -1) {
+        workers.value[idx] = worker
       } else {
         workers.value.push(worker)
       }
-      
+
       return worker
     } catch (err) {
       error.value = err.response?.data?.message || 'Failed to fetch worker'
@@ -85,22 +76,22 @@ export const useWorkersStore = defineStore('workers', () => {
   }
 
   function updateWorker(updatedWorker) {
-    const index = workers.value.findIndex(w => w.id === updatedWorker.id || w.worker_key === updatedWorker.worker_key)
-    if (index !== -1) {
-      workers.value[index] = { ...workers.value[index], ...updatedWorker }
+    const idx = workers.value.findIndex(
+      w => w.id === updatedWorker.id || w.worker_key === updatedWorker.worker_key
+    )
+    if (idx !== -1) {
+      workers.value[idx] = { ...workers.value[idx], ...updatedWorker }
     }
   }
 
-  function clearError() {
-    error.value = null
-  }
+  function clearError() { error.value = null }
 
   return {
     // State
     workers,
     loading,
     error,
-    
+
     // Computed
     totalWorkers,
     activeWorkers,
@@ -111,11 +102,11 @@ export const useWorkersStore = defineStore('workers', () => {
     totalTasksCompleted,
     totalTasksFailed,
     workerUtilization,
-    
+
     // Actions
     fetchWorkers,
     fetchWorker,
     updateWorker,
-    clearError
+    clearError,
   }
 })

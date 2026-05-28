@@ -173,7 +173,7 @@ const menuItems = [
     icon: 'UserIcon'
   },
   {
-    path: '/notifications',
+    path: '/admin/notifications',
     label: 'Notifications',
     icon: 'BellIcon',
     badge: true

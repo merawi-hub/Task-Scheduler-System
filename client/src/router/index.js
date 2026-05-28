@@ -242,6 +242,12 @@ const router = createRouter({
           name: 'admin-system-flow',
           component: () => import('@/views/admin/AdminSystemFlow.vue'),
           meta: { title: 'System Flow - Admin - Task Scheduler' }
+        },
+        {
+          path: 'notifications',
+          name: 'admin-notifications',
+          component: () => import('@/views/admin/AdminNotifications.vue'),
+          meta: { title: 'Notifications - Admin - Task Scheduler' }
         }
       ]
     },

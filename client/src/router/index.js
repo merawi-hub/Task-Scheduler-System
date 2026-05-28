@@ -236,6 +236,12 @@ const router = createRouter({
           name: 'admin-settings',
           component: AllUsers,
           meta: { title: 'Settings - Admin - Task Scheduler' }
+        },
+        {
+          path: 'system-flow',
+          name: 'admin-system-flow',
+          component: () => import('@/views/admin/AdminSystemFlow.vue'),
+          meta: { title: 'System Flow - Admin - Task Scheduler' }
         }
       ]
     },

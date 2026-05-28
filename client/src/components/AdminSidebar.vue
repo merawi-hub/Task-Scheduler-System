@@ -162,7 +162,7 @@ const menuItems = [
     icon: 'FileTextIcon'
   },
   {
-    path: '/system-flow',
+    path: '/admin/system-flow',
     label: 'System Flow',
     icon: 'FlowIcon'
   },

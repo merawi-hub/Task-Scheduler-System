@@ -1,6 +1,8 @@
 # Documentation and Setup Files (exclude from commits)
 *.txt
 *.md
+!README.txt
+!PROJECT_PRESENTATION.txt
 !client/package.json
 !server/composer.json
 !client/README.md

@@ -1,0 +1,202 @@
+
+  DISTRIBUTED TASK SCHEDULER - PROJECT PRESENTATION
+
+  Project Description
+
+This file contains the content short descriptions about our project.
+
+Title:
+  DISTRIBUTED TASK SCHEDULER
+  A Production-Ready Task Management Platform
+
+PROJECT OVERVIEW
+
+What is the Distributed Task Scheduler?
+
+Content:
+
+ PROJECT DESCRIPTION
+  A full-stack web application for managing and distributing computational 
+  tasks across multiple worker nodes with real-time monitoring and control.
+
+KEY OBJECTIVES
+  • Enable distributed processing of large-scale jobs
+  • Provide role-based access control for different user types
+  • Monitor system health and job progress in real-time
+  • Ensure fault tolerance and automatic task retry
+
+ USE CASES
+  • Data processing pipelines
+  • Image/video processing tasks
+  • Machine learning model training
+  • Batch job scheduling
+  • Scientific computations
+
+Visual Elements:
+  - System architecture diagram
+  - Icons for each objective
+  - Use case examples with icons
+
+THREE-ACTOR ARCHITECTURE
+
+Actor System Design
+
+Content:
+
+ACTOR 1: JOB SUBMITTERS (End Users)
+  Authentication: Email + Password (Laravel Sanctum)
+  Capabilities:
+    ✓ Submit new jobs with custom parameters
+    ✓ Monitor their own job progress
+    ✓ View task execution logs
+    ✓ Receive notifications on job completion
+  Dashboard: User Dashboard with personal job view
+
+ ACTOR 2: WORKER NODES (API Clients)
+  Who: Distributed computing nodes (programs/scripts)
+  Authentication: API Token (X-Worker-Token header)
+  Capabilities:
+    ✓ Register with the system
+    ✓ Request pending tasks from job queue
+    ✓ Execute tasks and report results
+    ✓ Send heartbeat signals for health monitoring
+  Access: API-only (no web interface)
+
+ ACTOR 3: SYSTEM ADMINISTRATORS
+  Authentication: Email + Password + Admin Flag
+  Capabilities:
+    ✓ View all jobs across all users
+    ✓ Manage user accounts
+    ✓ Monitor worker node health
+    ✓ View system-wide statistics
+    ✓ Handle system configuration
+  Dashboard: Admin Dashboard with full system control
+
+Visual Elements:
+  - Three columns with actor icons
+  - Flow diagram showing interactions
+  - Color-coded sections for each actor
+
+KEY FEATURES & TECHNOLOGY STACK
+
+Features & Technologies
+
+Content:
+
+ CORE FEATURES
+
+Job Management
+  • Create, update, delete jobs
+  • Real-time status tracking (Pending → Running → Completed/Failed)
+  • Task breakdown and distribution
+  • Automatic retry on failure
+  • Progress monitoring with percentage completion
+
+Worker Management
+  • Dynamic worker registration
+  • Health monitoring via heartbeats
+  • Load balancing across workers
+  • Worker status tracking (Active/Idle/Offline)
+  • Task assignment optimization
+
+User Management
+  • Secure authentication with token-based auth
+  • Role-based access control (RBAC)
+  • User isolation (users see only their jobs)
+  • Profile management
+  • Activity logging
+
+Real-Time Monitoring
+  • Live dashboard updates
+  • System statistics (jobs, workers, tasks)
+  • Activity feed with recent events
+  • Notification system
+  • Performance metrics
+
+ TECHNOLOGY STACK
+
+Backend:
+  • Laravel 11 (PHP 8.2+)
+  • MySQL 8.0 Database
+  • Laravel Sanctum (API Authentication)
+  • RESTful API Architecture
+  • Queue System for task distribution
+
+Frontend:
+  • Vue.js 3 (Progressive Framework)
+  • Vite (Build Tool)
+  • Pinia (State Management)
+  • Tailwind CSS (Styling)
+  • Axios (HTTP Client)
+  • Chart.js (Data Visualization)
+
+Visual Elements:
+  - Two-column layout (Features | Tech Stack)
+  - Technology logos
+  - Feature icons
+  - Color-coded sections
+
+SYSTEM ARCHITECTURE & BENEFITS
+Architecture & Project Benefits
+
+Content:
+
+
+ PROJECT BENEFITS
+
+For Organizations:
+  ✓ Scalable task processing without infrastructure complexity
+  ✓ Reduced processing time through parallel execution
+  ✓ Cost-effective resource utilization
+  ✓ Easy monitoring and management
+
+For Developers:
+  ✓ Simple API for job submission
+  ✓ Real-time progress tracking
+  ✓ Automatic error handling and retry
+  ✓ Comprehensive logging
+
+For System Administrators:
+  ✓ Centralized control panel
+  ✓ Health monitoring and alerts
+  ✓ User and resource management
+  ✓ Performance analytics
+
+Technical Advantages:
+  ✓ Production-ready with security best practices
+  ✓ Token-based authentication (stateless)
+  ✓ RESTful API design
+  ✓ Responsive modern UI
+  ✓ Fault-tolerant architecture
+  ✓ Horizontal scalability
+
+Visual Elements:
+  - Architecture diagram (as shown above)
+  - Benefits in columns
+  - Icons for each benefit category
+  - Professional color scheme
+
+Demo & Future Enhancements
+
+Content:
+
+ LIVE DEMO HIGHLIGHTS
+  • User registration and login
+  • Job submission with parameters
+  • Real-time dashboard updates
+  • Worker node monitoring
+  • Admin panel features
+
+
+
+
+               GROUP MEMBERS
+
+
+Student Name              ID number
+1. Abel Tewodros               4096/16
+2.Merawi Ayele                 1333/16
+3.Fitsum Gashaw                0824/16
+4.Mekdelawit Habtamu            1266/16
+5.iniam Gebrie                  0449/16
+6.Nefissa Hussen                4332/16

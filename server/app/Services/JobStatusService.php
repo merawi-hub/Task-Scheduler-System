@@ -29,11 +29,27 @@ class JobStatusService
             $cancelledCount = $taskCounts['cancelled'] ?? 0;
             $totalTasks = $job->total_tasks;
 
+            // Calculate progress percentage for milestone notifications
+            $previousProgress = $job->total_tasks > 0
+                ? round(($job->completed_tasks / $job->total_tasks) * 100)
+                : 0;
+
             // Update counts
             $job->update([
                 'completed_tasks' => $completedCount,
                 'failed_tasks' => $failedCount,
             ]);
+
+            // Check for progress milestones (25%, 50%, 75%)
+            $currentProgress = $totalTasks > 0
+                ? round(($completedCount / $totalTasks) * 100)
+                : 0;
+
+            foreach ([25, 50, 75] as $milestone) {
+                if ($previousProgress < $milestone && $currentProgress >= $milestone) {
+                    app(\App\Services\NotificationService::class)->notifyJobProgress($job, $milestone);
+                }
+            }
 
             // Determine job status
             $newStatus = $this->determineJobStatus(
@@ -69,6 +85,10 @@ class JobStatusService
                             'completed_at'    => now()->toIso8601String(),
                         ]
                     );
+
+                    // Send completion notification
+                    app(\App\Services\NotificationService::class)->notifyJobCompleted($job);
+
                 } elseif ($newStatus === 'failed') {
                     \App\Models\TaskLog::error(
                         $job->tasks()->where('status', 'failed')->latest('completed_at')->value('id') ?? 0,
@@ -79,6 +99,12 @@ class JobStatusService
                             'job_name'     => $job->name,
                             'failed_tasks' => $failedCount,
                         ]
+                    );
+
+                    // Send failure notification
+                    app(\App\Services\NotificationService::class)->notifyJobFailed(
+                        $job,
+                        "{$failedCount} task(s) permanently failed"
                     );
                 }
             }

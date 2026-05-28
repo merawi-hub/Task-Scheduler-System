@@ -89,6 +89,33 @@ export const metricsApi = {
     apiClient.get('/metrics/history', { params }).then((r) => r.data),
 }
 
+// ─── Notifications API ────────────────────────────────────────────────────────
+export const notificationsApi = {
+  getNotifications: (params = {}) =>
+    apiClient.get('/notifications', { params }).then((r) => r.data),
+
+  getUnreadCount: () =>
+    apiClient.get('/notifications/unread-count').then((r) => r.data),
+
+  getStats: () =>
+    apiClient.get('/notifications/stats').then((r) => r.data),
+
+  markAsRead: (id) =>
+    apiClient.post(`/notifications/${id}/read`).then((r) => r.data),
+
+  markAsUnread: (id) =>
+    apiClient.post(`/notifications/${id}/unread`).then((r) => r.data),
+
+  markAllAsRead: () =>
+    apiClient.post('/notifications/mark-all-read').then((r) => r.data),
+
+  deleteNotification: (id) =>
+    apiClient.delete(`/notifications/${id}`).then((r) => r.data),
+
+  deleteAllRead: () =>
+    apiClient.delete('/notifications/read').then((r) => r.data),
+}
+
 // ─── Admin API ────────────────────────────────────────────────────────────────
 export const adminApi = {
   // Jobs
@@ -122,6 +149,25 @@ export const adminApi = {
 
   deleteWorker: (key) =>
     apiClient.delete(`/admin/workers/${key}`).then((r) => r.data),
+
+  // Worker Process Management (UI-based control)
+  startWorker: (workerKey, options = {}) =>
+    apiClient.post('/admin/workers/start', { worker_key: workerKey, ...options }).then((r) => r.data),
+
+  startMultipleWorkers: (count, options = {}) =>
+    apiClient.post('/admin/workers/start-multiple', { count, ...options }).then((r) => r.data),
+
+  stopWorker: (key) =>
+    apiClient.post(`/admin/workers/${key}/stop`).then((r) => r.data),
+
+  stopAllWorkers: () =>
+    apiClient.post('/admin/workers/stop-all').then((r) => r.data),
+
+  getWorkerProcesses: () =>
+    apiClient.get('/admin/workers/processes/list').then((r) => r.data),
+
+  cleanupWorkerProcesses: () =>
+    apiClient.post('/admin/workers/processes/cleanup').then((r) => r.data),
 
   // Users
   getAllUsers: (params = {}) =>

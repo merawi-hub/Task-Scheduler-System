@@ -125,6 +125,11 @@
           </div>
         </div>
 
+        <!-- Worker Control Panel -->
+        <div class="mb-8">
+          <WorkerControlPanel />
+        </div>
+
         <!-- Charts Row -->
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
           <!-- Jobs Overview Chart -->
@@ -218,6 +223,7 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useAdminStore } from '@/stores/adminStore'
 import LineChart from '@/components/charts/LineChart.vue'
 import DonutChart from '@/components/charts/DonutChart.vue'
+import WorkerControlPanel from '@/components/WorkerControlPanel.vue'
 
 const adminStore = useAdminStore()
 const loading = ref(false)

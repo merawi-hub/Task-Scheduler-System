@@ -1,5 +1,6 @@
 <template>
-  <div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+  <div>
+    <div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
 
     <!-- ── Header ─────────────────────────────────────────────────────────── -->
     <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
@@ -44,7 +45,7 @@
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
             d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
         </svg>
-        <div>
+        <div class="flex-1">
           <p class="text-sm font-semibold text-amber-800">No workers running</p>
           <p class="text-xs text-amber-700 mt-0.5">
             Without workers, all {{ pendingTasksAvailable }} tasks stay PENDING.
@@ -52,11 +53,34 @@
           </p>
         </div>
       </div>
-      <div class="bg-gray-900 rounded-xl p-4">
-        <p class="text-xs text-gray-400 mb-2 font-mono"># Open 3 terminals and run:</p>
-        <p class="text-xs text-green-400 font-mono">php artisan worker:run --key=worker-1</p>
-        <p class="text-xs text-green-400 font-mono">php artisan worker:run --key=worker-2</p>
-        <p class="text-xs text-green-400 font-mono">php artisan worker:run --key=worker-3</p>
+
+      <!-- Admin: Show Start Workers Button -->
+      <div v-if="isAdmin" class="text-center">
+        <button
+          @click="openWorkerModal"
+          class="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold rounded-lg hover:from-indigo-700 hover:to-purple-700 transition-all shadow-lg hover:shadow-xl"
+        >
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+          </svg>
+          Start Workers
+        </button>
+        <p class="text-xs text-gray-500 mt-3">
+          Click to start worker processes from the UI
+        </p>
+      </div>
+
+      <!-- Non-Admin: Show Contact Message -->
+      <div v-else class="text-center py-4">
+        <div class="inline-flex items-center gap-2 px-4 py-2 bg-blue-50 border border-blue-200 rounded-lg">
+          <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+          </svg>
+          <p class="text-sm text-blue-800 font-medium">
+            Contact your administrator to start workers
+          </p>
+        </div>
       </div>
     </div>
 
@@ -346,12 +370,22 @@
       <p class="text-xs text-gray-400">Refreshes every 3s</p>
     </div>
 
+    </div>
+
+    <!-- Worker Management Modal -->
+    <WorkerManagementModal
+      :is-open="showWorkerModal"
+      @close="showWorkerModal = false"
+      @workers-started="handleWorkersStarted"
+    />
   </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import apiClient from '@/api/axios'
+import { useAuthStore } from '@/stores/authStore'
+import WorkerManagementModal from './modals/WorkerManagementModal.vue'
 
 // ── Props ─────────────────────────────────────────────────────────────────────
 defineProps({
@@ -362,7 +396,21 @@ defineProps({
 const activity     = ref(null)
 const loading      = ref(false)
 const snapshotTime = ref('—')
+const showWorkerModal = ref(false)
 let   pollTimer    = null
+
+// ── Auth ──────────────────────────────────────────────────────────────────────
+const authStore = useAuthStore()
+const isAdmin = computed(() => authStore.user?.is_admin === true || authStore.user?.is_admin === 1)
+
+// ── Methods ───────────────────────────────────────────────────────────────────
+const openWorkerModal = () => {
+  showWorkerModal.value = true
+}
+
+const handleWorkersStarted = () => {
+  refresh()
+}
 
 // ── Computed ──────────────────────────────────────────────────────────────────
 const busyWorkers           = computed(() => activity.value?.busy_workers           ?? [])
@@ -457,3 +505,7 @@ onUnmounted(() => {
   if (pollTimer) clearInterval(pollTimer)
 })
 </script>
+
+<style scoped>
+/* Add any component-specific styles here if needed */
+</style>

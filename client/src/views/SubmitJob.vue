@@ -91,11 +91,6 @@
                         ]">
                         <span class="text-lg">{{ type.icon }}</span>
                         <span>{{ type.label }}</span>
-                        <!-- "NEW" badge for result_processing -->
-                        <span v-if="type.value === 'result_processing'"
-                          class="mt-0.5 px-1.5 py-0.5 bg-green-100 text-green-700 text-[10px] font-bold rounded-full">
-                          NEW
-                        </span>
                       </button>
                     </div>
                   </div>
@@ -108,15 +103,9 @@
                         d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
                     </svg>
                     <div class="text-xs text-blue-800">
-                      <p class="font-semibold mb-1">How result_processing works</p>
-                      <p>The system will generate <strong>{{ totalRecords }} student records</strong> and split them
-                         across <strong>{{ form.task_count }} tasks</strong>
-                         (~<strong>{{ recordsPerTask }} records / task</strong>).</p>
-                      <p class="mt-1">Each task runs:
-                        <span class="font-mono bg-blue-100 px-1 rounded">calculate_grades</span> →
-                        <span class="font-mono bg-blue-100 px-1 rounded">generate_report</span> →
-                        <span class="font-mono bg-blue-100 px-1 rounded">validate_data</span>
-                      </p>
+                      <p class="font-semibold mb-1">Result Processing Job Type</p>
+                      <p>This job type processes student records with configurable operations like grade calculation, report generation, and data validation.</p>
+                      <p class="mt-1">You can specify the number of records and select which operations to perform on each record.</p>
                     </div>
                   </div>
 
@@ -285,67 +274,6 @@
                 </div>
               </div>
 
-              <!-- Demo Mode: Auto Generate Test Tasks (for result_processing) -->
-              <div v-if="form.type === 'result_processing'" class="bg-white rounded-xl border border-gray-100 shadow-sm">
-                <div class="px-6 py-4 border-b border-gray-100 flex items-center gap-3">
-                  <div class="w-8 h-8 bg-indigo-100 rounded-lg flex items-center justify-center">
-                    <svg class="w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                        d="M13 10V3L4 14h7v7l9-11h-7z"/>
-                    </svg>
-                  </div>
-                  <div>
-                    <h2 class="text-sm font-semibold text-gray-900">Demo Mode: Auto Generate Test Tasks</h2>
-                    <p class="text-xs text-gray-500">System will automatically generate test data</p>
-                  </div>
-                </div>
-                <div class="p-6">
-                  <div class="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-xl p-6 border border-indigo-100">
-                    <div class="flex items-start gap-4">
-                      <div class="w-12 h-12 bg-indigo-600 rounded-xl flex items-center justify-center flex-shrink-0">
-                        <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                            d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
-                        </svg>
-                      </div>
-                      <div class="flex-1">
-                        <h3 class="text-sm font-bold text-indigo-900 mb-2">Simulation Preview</h3>
-                        <div class="space-y-2 text-sm text-indigo-800">
-                          <div class="flex items-center gap-2">
-                            <svg class="w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
-                            </svg>
-                            <span><strong>{{ form.task_count }} tasks</strong> will be generated</span>
-                          </div>
-                          <div class="flex items-center gap-2">
-                            <svg class="w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
-                            </svg>
-                            <span><strong>{{ totalRecords.toLocaleString() }} student records</strong> will be processed</span>
-                          </div>
-                          <div class="flex items-center gap-2">
-                            <svg class="w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                            </svg>
-                            <span>Estimated execution time: <strong>{{ estimateParallel }}</strong></span>
-                          </div>
-                        </div>
-                        <div class="mt-4 pt-4 border-t border-indigo-200">
-                          <p class="text-xs text-indigo-700 font-medium mb-2">Operations per task:</p>
-                          <div class="flex flex-wrap gap-2">
-                            <span class="px-2 py-1 bg-indigo-100 text-indigo-800 text-xs font-mono rounded">calculate_grades()</span>
-                            <span class="text-indigo-400">→</span>
-                            <span class="px-2 py-1 bg-indigo-100 text-indigo-800 text-xs font-mono rounded">generate_report()</span>
-                            <span class="text-indigo-400">→</span>
-                            <span class="px-2 py-1 bg-indigo-100 text-indigo-800 text-xs font-mono rounded">validate_data()</span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
               <!-- Error -->
               <div v-if="error"
                 class="flex items-start gap-3 p-4 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">
@@ -410,18 +338,6 @@
                     <div class="bg-gray-50 rounded-lg p-3 text-center">
                       <p class="text-lg font-bold" :class="priorityColor">{{ priorityLabel }}</p>
                       <p class="text-xs text-gray-500 mt-0.5">Priority</p>
-                    </div>
-                  </div>
-                  <!-- records breakdown for result_processing -->
-                  <div v-if="form.type === 'result_processing'"
-                    class="bg-indigo-50 rounded-lg p-3 space-y-1.5">
-                    <div class="flex justify-between text-xs">
-                      <span class="text-indigo-600">Total records</span>
-                      <span class="font-bold text-indigo-800">{{ totalRecords.toLocaleString() }}</span>
-                    </div>
-                    <div class="flex justify-between text-xs">
-                      <span class="text-indigo-600">Records / task</span>
-                      <span class="font-bold text-indigo-800">{{ recordsPerTask }}</span>
                     </div>
                   </div>
                 </div>

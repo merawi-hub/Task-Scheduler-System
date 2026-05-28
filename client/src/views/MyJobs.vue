@@ -14,15 +14,22 @@
               <p class="text-sm text-gray-500 mt-1">Manage and monitor all your submitted jobs</p>
             </div>
             <div class="flex items-center gap-3">
-              <!-- Filter Dropdown -->
-              <select v-model="filterStatus" class="px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                <option value="">All Status</option>
-                <option value="pending">Pending</option>
-                <option value="running">Running</option>
-                <option value="completed">Completed</option>
-                <option value="failed">Failed</option>
-                <option value="cancelled">Cancelled</option>
-              </select>
+              <!-- Status Filters -->
+              <div class="flex items-center gap-2 bg-gray-100 rounded-lg p-1">
+                <button 
+                  v-for="filter in statusFilters" 
+                  :key="filter.value"
+                  @click="filterStatus = filter.value"
+                  :class="[
+                    'px-4 py-2 rounded-md text-sm font-medium transition-all',
+                    filterStatus === filter.value 
+                      ? 'bg-white text-gray-900 shadow-sm' 
+                      : 'text-gray-600 hover:text-gray-900'
+                  ]"
+                >
+                  {{ filter.label }}
+                </button>
+              </div>
 
               <!-- Refresh Button -->
               <button @click="refreshJobs" class="flex items-center gap-2 px-4 py-2 text-gray-600 hover:text-gray-900 rounded-lg hover:bg-gray-100 transition-colors">
@@ -40,6 +47,26 @@
                 <span class="text-sm font-medium">Create Job</span>
               </button>
             </div>
+          </div>
+        </div>
+        
+        <!-- Connection Warning Banner (Requirement 14.4) -->
+        <div v-if="connectionWarning" class="px-8 py-3 bg-yellow-50 border-t border-yellow-200">
+          <div class="flex items-center gap-3">
+            <svg class="w-5 h-5 text-yellow-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+            </svg>
+            <div class="flex-1">
+              <p class="text-sm font-medium text-yellow-800">Connection issue detected</p>
+              <p class="text-xs text-yellow-700 mt-0.5">Unable to connect to the server. Please check your network connection.</p>
+            </div>
+            <button 
+              @click="refreshJobs" 
+              class="px-3 py-1.5 text-xs font-medium text-yellow-700 hover:text-yellow-900 bg-yellow-100 hover:bg-yellow-200 rounded-lg transition-colors"
+              :disabled="loading"
+            >
+              {{ loading ? 'Retrying...' : 'Retry Now' }}
+            </button>
           </div>
         </div>
       </header>
@@ -123,18 +150,37 @@
         <div class="bg-white rounded-xl border border-gray-100 shadow-sm">
           <div class="p-6 border-b border-gray-100">
             <div class="flex items-center justify-between">
-              <h3 class="text-lg font-semibold text-gray-900">All Jobs</h3>
+              <div class="flex items-center gap-3">
+                <h3 class="text-lg font-semibold text-gray-900">All Jobs</h3>
+                <!-- Show matching count when search is active -->
+                <span v-if="isSearchActive" class="px-3 py-1 bg-indigo-100 text-indigo-700 text-sm font-medium rounded-full">
+                  {{ matchingJobsCount }} {{ matchingJobsCount === 1 ? 'match' : 'matches' }}
+                </span>
+              </div>
               <div class="flex items-center gap-3">
                 <div class="relative">
                   <input
                     v-model="searchQuery"
                     type="text"
-                    placeholder="Search jobs..."
-                    class="pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    placeholder="Search by name, type, or date..."
+                    :class="[
+                      'pl-10 pr-4 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all',
+                      isSearchActive ? 'border-indigo-500 bg-indigo-50' : 'border-gray-300'
+                    ]"
                   />
-                  <svg class="w-5 h-5 text-gray-400 absolute left-3 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg class="w-5 h-5 absolute left-3 top-2.5 transition-colors" :class="isSearchActive ? 'text-indigo-600' : 'text-gray-400'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                   </svg>
+                  <!-- Clear search button when active -->
+                  <button
+                    v-if="isSearchActive"
+                    @click="searchQuery = ''"
+                    class="absolute right-3 top-2.5 text-gray-400 hover:text-gray-600"
+                  >
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
                 </div>
               </div>
             </div>
@@ -148,8 +194,33 @@
 
           <!-- Error State -->
           <div v-else-if="error" class="p-6">
-            <div class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
-              {{ error }}
+            <div class="bg-red-50 border border-red-200 rounded-lg p-6">
+              <div class="flex items-start gap-4">
+                <!-- Error Icon -->
+                <div class="flex-shrink-0">
+                  <svg class="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                  </svg>
+                </div>
+                
+                <!-- Error Content -->
+                <div class="flex-1">
+                  <h3 class="text-sm font-semibold text-red-800 mb-1">Unable to Load Jobs</h3>
+                  <p class="text-sm text-red-700">{{ error }}</p>
+                  
+                  <!-- Retry Button (Requirement 14.5) -->
+                  <button 
+                    @click="refreshJobs" 
+                    class="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 transition-colors"
+                    :disabled="loading"
+                  >
+                    <svg class="w-4 h-4" :class="{ 'animate-spin': loading }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                    </svg>
+                    {{ loading ? 'Retrying...' : 'Retry' }}
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -180,7 +251,7 @@
                 </tr>
               </thead>
               <tbody class="divide-y divide-gray-100">
-                <tr v-for="job in filteredJobs" :key="job.id"
+                <tr v-for="job in paginatedJobs" :key="job.id"
                   :class="[
                     'hover:bg-gray-50 cursor-pointer transition-colors',
                     recentlyCompleted.has(job.id) ? 'bg-green-50 ring-2 ring-green-300 ring-inset' : ''
@@ -224,7 +295,7 @@
                   <td class="px-6 py-4 whitespace-nowrap">
                     <div class="flex items-center gap-2">
                       <div class="flex-1 bg-gray-200 rounded-full h-2 max-w-[100px]">
-                        <div :class="getProgressColor(job.status)" class="h-2 rounded-full transition-all" :style="{ width: getProgress(job) + '%' }"></div>
+                        <div :class="getProgressColor(job.status)" class="h-2 rounded-full transition-all duration-500 ease-in-out" :style="{ width: getProgress(job) + '%' }"></div>
                       </div>
                       <span class="text-xs font-medium text-gray-600">{{ getProgress(job) }}%</span>
                     </div>
@@ -235,17 +306,77 @@
                   <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ formatDate(job.created_at) }}</td>
                   <td class="px-6 py-4 whitespace-nowrap text-sm">
                     <div class="flex items-center gap-2">
-                      <button @click.stop="viewJob(job)" class="text-indigo-600 hover:text-indigo-900 font-medium">
-                        View
+                      <button @click.stop="viewJob(job)" class="text-indigo-600 hover:text-indigo-900 font-medium px-3 py-1 rounded hover:bg-indigo-50">
+                        View Details
                       </button>
-                      <button v-if="job.status === 'running' || job.status === 'pending'" @click.stop="cancelJob(job)" class="text-red-600 hover:text-red-900 font-medium">
+                      <button @click.stop="$router.push(`/jobs/${job.id}/monitoring`)" class="text-blue-600 hover:text-blue-900 font-medium px-3 py-1 rounded hover:bg-blue-50">
+                        Monitor
+                      </button>
+                      <button v-if="job.status === 'running' || job.status === 'pending'" @click.stop="cancelJob(job)" class="text-red-600 hover:text-red-900 font-medium px-3 py-1 rounded hover:bg-red-50">
                         Cancel
+                      </button>
+                      <button v-if="job.status === 'failed'" @click.stop="retryJob(job)" class="text-orange-600 hover:text-orange-900 font-medium px-3 py-1 rounded hover:bg-orange-50">
+                        Retry
                       </button>
                     </div>
                   </td>
                 </tr>
               </tbody>
             </table>
+            
+            <!-- Pagination Controls (Requirement 15.1) -->
+            <div v-if="totalPages > 1" class="px-6 py-4 border-t border-gray-100 flex items-center justify-between">
+              <div class="text-sm text-gray-500">
+                Showing {{ ((currentPage - 1) * pageSize) + 1 }} to {{ Math.min(currentPage * pageSize, filteredJobs.length) }} of {{ filteredJobs.length }} jobs
+              </div>
+              <div class="flex items-center gap-2">
+                <button 
+                  @click="currentPage = 1" 
+                  :disabled="currentPage === 1"
+                  class="px-3 py-1 text-sm font-medium rounded-lg transition-colors"
+                  :class="currentPage === 1 ? 'text-gray-400 cursor-not-allowed' : 'text-gray-700 hover:bg-gray-100'"
+                >
+                  First
+                </button>
+                <button 
+                  @click="currentPage--" 
+                  :disabled="currentPage === 1"
+                  class="px-3 py-1 text-sm font-medium rounded-lg transition-colors"
+                  :class="currentPage === 1 ? 'text-gray-400 cursor-not-allowed' : 'text-gray-700 hover:bg-gray-100'"
+                >
+                  Previous
+                </button>
+                
+                <div class="flex items-center gap-1">
+                  <button 
+                    v-for="page in visiblePageNumbers" 
+                    :key="page"
+                    @click="currentPage = page"
+                    class="px-3 py-1 text-sm font-medium rounded-lg transition-colors"
+                    :class="currentPage === page ? 'bg-indigo-600 text-white' : 'text-gray-700 hover:bg-gray-100'"
+                  >
+                    {{ page }}
+                  </button>
+                </div>
+                
+                <button 
+                  @click="currentPage++" 
+                  :disabled="currentPage === totalPages"
+                  class="px-3 py-1 text-sm font-medium rounded-lg transition-colors"
+                  :class="currentPage === totalPages ? 'text-gray-400 cursor-not-allowed' : 'text-gray-700 hover:bg-gray-100'"
+                >
+                  Next
+                </button>
+                <button 
+                  @click="currentPage = totalPages" 
+                  :disabled="currentPage === totalPages"
+                  class="px-3 py-1 text-sm font-medium rounded-lg transition-colors"
+                  :class="currentPage === totalPages ? 'text-gray-400 cursor-not-allowed' : 'text-gray-700 hover:bg-gray-100'"
+                >
+                  Last
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       </main>
@@ -257,23 +388,51 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import UserSidebar from '@/components/UserSidebar.vue'
 import CreateJobModal from '@/components/modals/CreateJobModal.vue'
+import { useToastStore } from '@/stores/toastStore'
 import api from '@/api'
 
 const router = useRouter()
+const toastStore = useToastStore()
+
+const statusFilters = [
+  { label: 'All', value: '' },
+  { label: 'Running', value: 'running' },
+  { label: 'Completed', value: 'completed' },
+  { label: 'Failed', value: 'failed' },
+  { label: 'Cancelled', value: 'cancelled' }
+]
 
 const jobs = ref([])
 const loading = ref(false)
 const error = ref(null)
 const filterStatus = ref('')
 const searchQuery = ref('')
+const debouncedSearchQuery = ref('')
 const showCreateModal = ref(false)
 // Track newly completed jobs to highlight them
 const recentlyCompleted = ref(new Set())
+// Connection status tracking (Requirement 14.4)
+const connectionWarning = ref(false)
+const isOffline = ref(false)
+// Pagination state (Requirement 15.1)
+const currentPage = ref(1)
+const pageSize = 50 // Show 50 jobs per page
 let pollTimer = null
+let searchDebounceTimer = null
+
+// Debounce search input with 300ms delay (Requirement 15.4)
+watch(searchQuery, (newValue) => {
+  if (searchDebounceTimer) {
+    clearTimeout(searchDebounceTimer)
+  }
+  searchDebounceTimer = setTimeout(() => {
+    debouncedSearchQuery.value = newValue
+  }, 300)
+})
 
 const jobStats = computed(() => {
   return {
@@ -288,28 +447,88 @@ const jobStats = computed(() => {
 const filteredJobs = computed(() => {
   let filtered = jobs.value
 
+  // Apply status filter
   if (filterStatus.value) {
     filtered = filtered.filter(j => j.status === filterStatus.value)
   }
 
-  if (searchQuery.value) {
-    const query = searchQuery.value.toLowerCase()
-    filtered = filtered.filter(j => 
-      j.name.toLowerCase().includes(query) ||
-      j.id.toString().includes(query)
-    )
+  // Apply search filter (debounced) - search by Job Name, Job Type, and Created Date
+  if (debouncedSearchQuery.value) {
+    const query = debouncedSearchQuery.value.toLowerCase()
+    filtered = filtered.filter(j => {
+      const jobName = (j.name || '').toLowerCase()
+      const jobType = (j.type || 'general').toLowerCase()
+      const jobId = j.id.toString()
+      const createdDate = formatDate(j.created_at).toLowerCase()
+      
+      return jobName.includes(query) || 
+             jobType.includes(query) || 
+             jobId.includes(query) ||
+             createdDate.includes(query)
+    })
   }
 
   return filtered
 })
 
+// Computed property to check if search is active
+const isSearchActive = computed(() => debouncedSearchQuery.value.length > 0)
+
+// Computed property for matching jobs count
+const matchingJobsCount = computed(() => filteredJobs.value.length)
+
+// Pagination computed properties (Requirement 15.1)
+const totalPages = computed(() => Math.ceil(filteredJobs.value.length / pageSize))
+
+const paginatedJobs = computed(() => {
+  const start = (currentPage.value - 1) * pageSize
+  const end = start + pageSize
+  return filteredJobs.value.slice(start, end)
+})
+
+const visiblePageNumbers = computed(() => {
+  const total = totalPages.value
+  const current = currentPage.value
+  const pages = []
+  
+  // Show up to 5 page numbers
+  let startPage = Math.max(1, current - 2)
+  let endPage = Math.min(total, current + 2)
+  
+  // Adjust if we're near the beginning or end
+  if (current <= 3) {
+    endPage = Math.min(5, total)
+  }
+  if (current >= total - 2) {
+    startPage = Math.max(1, total - 4)
+  }
+  
+  for (let i = startPage; i <= endPage; i++) {
+    pages.push(i)
+  }
+  
+  return pages
+})
+
+// Reset to page 1 when filters change
+watch([filterStatus, debouncedSearchQuery], () => {
+  currentPage.value = 1
+})
+
 async function refreshJobs() {
   loading.value = true
   error.value = null
+  connectionWarning.value = false
 
   try {
+    // Requirement 15.2: Optimize initial render for up to 100 jobs
+    // Fetch with pagination to improve performance
     const response = await api.get('/jobs', {
-      params: { sort_by: 'created_at', sort_order: 'desc', per_page: 100 }
+      params: { 
+        sort_by: 'created_at', 
+        sort_order: 'desc', 
+        per_page: 100  // Limit to 100 jobs for performance
+      }
     })
     const newJobs = response.data.data || response.data || []
 
@@ -327,8 +546,24 @@ async function refreshJobs() {
     })
 
     jobs.value = newJobs
+    isOffline.value = false
   } catch (err) {
-    error.value = err.response?.data?.message || 'Failed to load jobs'
+    // Requirement 14.1: Display user-friendly error messages
+    if (err.code === 'ERR_NETWORK' || err.message === 'Network Error') {
+      error.value = 'Unable to connect to the server. Please check your internet connection.'
+      connectionWarning.value = true
+      isOffline.value = true
+    } else if (err.response?.status === 401) {
+      error.value = 'Your session has expired. Please log in again.'
+    } else if (err.response?.status === 403) {
+      error.value = 'You do not have permission to view jobs.'
+    } else if (err.response?.status === 500) {
+      error.value = 'Server error occurred. Please try again later.'
+    } else if (err.response?.status === 503) {
+      error.value = 'Service temporarily unavailable. Please try again in a few moments.'
+    } else {
+      error.value = err.response?.data?.message || 'Failed to load jobs. Please try again.'
+    }
   } finally {
     loading.value = false
   }
@@ -346,6 +581,7 @@ function scheduleNextPoll() {
 
 onUnmounted(() => {
   if (pollTimer) clearTimeout(pollTimer)
+  if (searchDebounceTimer) clearTimeout(searchDebounceTimer)
 })
 
 function handleJobCreated(newJob) {
@@ -362,13 +598,56 @@ function viewJob(job) {
   router.push(`/jobs/${job.id}`)
 }
 
+async function retryJob(job) {
+  if (confirm(`Retry "${job.name}"?`)) {
+    try {
+      const response = await api.post(`/jobs/${job.id}/retry`)
+      toastStore.success(response.data.message || 'Job retry initiated successfully')
+      await refreshJobs()
+    } catch (err) {
+      // Requirement 14.3: Show error notification with failure reason
+      let errorMessage = 'Failed to retry job'
+      
+      if (err.code === 'ERR_NETWORK' || err.message === 'Network Error') {
+        errorMessage = 'Unable to retry job: Network connection lost'
+      } else if (err.response?.status === 404) {
+        errorMessage = 'Job not found. It may have been deleted.'
+      } else if (err.response?.status === 403) {
+        errorMessage = 'You do not have permission to retry this job.'
+      } else if (err.response?.status === 409) {
+        errorMessage = err.response?.data?.message || 'Job cannot be retried in its current state.'
+      } else if (err.response?.data?.message) {
+        errorMessage = `Failed to retry job: ${err.response.data.message}`
+      }
+      
+      toastStore.error(errorMessage)
+    }
+  }
+}
+
 async function cancelJob(job) {
   if (confirm(`Are you sure you want to cancel "${job.name}"?`)) {
     try {
-      await api.delete(`/jobs/${job.id}`)
+      const response = await api.delete(`/jobs/${job.id}`)
+      toastStore.success(response.data.message || 'Job cancelled successfully')
       await refreshJobs()
     } catch (err) {
-      alert(err.response?.data?.message || 'Failed to cancel job')
+      // Requirement 14.3: Show error notification with failure reason
+      let errorMessage = 'Failed to cancel job'
+      
+      if (err.code === 'ERR_NETWORK' || err.message === 'Network Error') {
+        errorMessage = 'Unable to cancel job: Network connection lost'
+      } else if (err.response?.status === 404) {
+        errorMessage = 'Job not found. It may have already been cancelled or deleted.'
+      } else if (err.response?.status === 403) {
+        errorMessage = 'You do not have permission to cancel this job.'
+      } else if (err.response?.status === 409) {
+        errorMessage = err.response?.data?.message || 'Job cannot be cancelled in its current state.'
+      } else if (err.response?.data?.message) {
+        errorMessage = `Failed to cancel job: ${err.response.data.message}`
+      }
+      
+      toastStore.error(errorMessage)
     }
   }
 }
@@ -395,7 +674,13 @@ function getProgressColor(status) {
 }
 
 function getProgress(job) {
+  // Handle edge case: zero total tasks
   if (!job.total_tasks || job.total_tasks === 0) return 0
+  
+  // Ensure completed jobs always show 100%
+  if (job.status === 'completed') return 100
+  
+  // Calculate progress: (completed / total) * 100
   return Math.round((job.completed_tasks / job.total_tasks) * 100)
 }
 

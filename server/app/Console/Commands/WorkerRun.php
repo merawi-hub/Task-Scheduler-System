@@ -231,7 +231,7 @@ class WorkerRun extends Command
     /**
      * Process a result_processing task.
      *
-     * Simulates:
+     * Performs actual data processing:
      *   1. calculate_grades  — compute average score for each student
      *   2. generate_report   — format the result
      *   3. validate_data     — check for anomalies
@@ -243,51 +243,138 @@ class WorkerRun extends Command
         $operations = $payload['operations'] ?? ['calculate_grades', 'generate_report', 'validate_data'];
         $recordFrom = $payload['record_from'] ?? 1;
         $recordTo   = $payload['record_to']   ?? count($records);
+        $recordsCount = $payload['records_count'] ?? count($records);
 
         $this->line(
-            "  <fg=cyan>[{$this->workerKey}]</>   📚 Processing {$payload['records_count']} students "
+            "  <fg=cyan>[{$this->workerKey}]</>   📚 Processing {$recordsCount} students "
             . "(records {$recordFrom}→{$recordTo})"
         );
 
         $processed = [];
         $errors    = 0;
+        $warnings  = 0;
 
-        foreach ($records as $student) {
-            // Simulate occasional failure
-            if ($this->failRate > 0 && rand(1, 100) <= $this->failRate) {
-                throw new Exception("Simulated failure on student #{$student['id']}");
+        // Step 1: Calculate grades for each student
+        if (in_array('calculate_grades', $operations)) {
+            $this->line("  <fg=cyan>[{$this->workerKey}]</>   ⚙  Step 1/3: Calculating grades...");
+            
+            foreach ($records as $index => $student) {
+                try {
+                    // Simulate occasional failure
+                    if ($this->failRate > 0 && rand(1, 100) <= $this->failRate) {
+                        throw new Exception("Simulated failure on student #{$student['id']}");
+                    }
+
+                    $scores  = $student['scores'] ?? [];
+                    
+                    // Validate scores
+                    if (empty($scores)) {
+                        $warnings++;
+                        $this->warn("  <fg=cyan>[{$this->workerKey}]</>   ⚠  Student #{$student['id']} has no scores");
+                    }
+
+                    $average = count($scores) > 0 ? round(array_sum($scores) / count($scores), 2) : 0;
+                    $grade   = $this->calculateGrade($average);
+
+                    $processed[] = [
+                        'student_id' => $student['id'],
+                        'name'       => $student['name'],
+                        'average'    => $average,
+                        'grade'      => $grade,
+                        'subject'    => $student['subject'] ?? 'Unknown',
+                        'scores'     => $scores,
+                        'status'     => 'processed',
+                    ];
+
+                    // Simulate realistic processing time per record
+                    usleep(rand(10000, 50000)); // 10-50ms per record
+
+                } catch (Exception $e) {
+                    $errors++;
+                    $this->error("  <fg=cyan>[{$this->workerKey}]</>   ❌ Error processing student #{$student['id']}: {$e->getMessage()}");
+                    
+                    // Re-throw if too many errors
+                    if ($errors > count($records) * 0.1) { // More than 10% failure rate
+                        throw new Exception("Too many processing errors ({$errors}/" . count($records) . ")");
+                    }
+                }
             }
-
-            $scores  = $student['scores'] ?? [];
-            $average = count($scores) > 0 ? round(array_sum($scores) / count($scores), 2) : 0;
-            $grade   = $this->calculateGrade($average);
-
-            $processed[] = [
-                'student_id' => $student['id'],
-                'name'       => $student['name'],
-                'average'    => $average,
-                'grade'      => $grade,
-                'subject'    => $student['subject'] ?? 'Unknown',
-            ];
+            
+            $this->line("  <fg=cyan>[{$this->workerKey}]</>   ✓ calculate_grades completed");
         }
 
-        // Simulate processing time (proportional to record count)
-        $sleepMs = min(count($records) * 2, 3000); // max 3s
-        usleep($sleepMs * 1000);
+        // Step 2: Generate report
+        if (in_array('generate_report', $operations)) {
+            $this->line("  <fg=cyan>[{$this->workerKey}]</>   ⚙  Step 2/3: Generating report...");
+            
+            // Calculate statistics
+            $averages = array_column($processed, 'average');
+            $statistics = [
+                'total_students' => count($processed),
+                'average_score'  => count($averages) > 0 ? round(array_sum($averages) / count($averages), 2) : 0,
+                'highest_score'  => count($averages) > 0 ? max($averages) : 0,
+                'lowest_score'   => count($averages) > 0 ? min($averages) : 0,
+                'grade_distribution' => $this->calculateGradeDistribution($processed),
+            ];
+            
+            // Simulate report generation time
+            usleep(rand(100000, 300000)); // 100-300ms
+            
+            $this->line("  <fg=cyan>[{$this->workerKey}]</>   ✓ generate_report completed");
+        }
 
-        foreach ($operations as $op) {
-            $this->line("  <fg=cyan>[{$this->workerKey}]</>   ✓ {$op}");
+        // Step 3: Validate data
+        if (in_array('validate_data', $operations)) {
+            $this->line("  <fg=cyan>[{$this->workerKey}]</>   ⚙  Step 3/3: Validating data...");
+            
+            foreach ($processed as &$record) {
+                // Check for anomalies
+                if ($record['average'] > 100 || $record['average'] < 0) {
+                    $record['validation_warning'] = 'Score out of valid range';
+                    $warnings++;
+                }
+                
+                if (empty($record['name'])) {
+                    $record['validation_warning'] = 'Missing student name';
+                    $warnings++;
+                }
+            }
+            
+            // Simulate validation time
+            usleep(rand(50000, 150000)); // 50-150ms
+            
+            $this->line("  <fg=cyan>[{$this->workerKey}]</>   ✓ validate_data completed");
         }
 
         return [
-            'type'             => 'result_processing',
-            'records_processed'=> count($processed),
-            'errors'           => $errors,
-            'worker'           => $this->workerKey,
-            'record_from'      => $recordFrom,
-            'record_to'        => $recordTo,
-            'operations_done'  => $operations,
+            'type'              => 'result_processing',
+            'records_processed' => count($processed),
+            'errors'            => $errors,
+            'warnings'          => $warnings,
+            'worker'            => $this->workerKey,
+            'record_from'       => $recordFrom,
+            'record_to'         => $recordTo,
+            'operations_done'   => $operations,
+            'statistics'        => $statistics ?? null,
+            'processed_data'    => $processed,
         ];
+    }
+
+    /**
+     * Calculate grade distribution
+     */
+    private function calculateGradeDistribution(array $processed): array
+    {
+        $distribution = ['A' => 0, 'B' => 0, 'C' => 0, 'D' => 0, 'F' => 0];
+        
+        foreach ($processed as $record) {
+            $grade = $record['grade'] ?? 'F';
+            if (isset($distribution[$grade])) {
+                $distribution[$grade]++;
+            }
+        }
+        
+        return $distribution;
     }
 
     private function calculateGrade(float $average): string

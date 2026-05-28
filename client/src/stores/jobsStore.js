@@ -49,6 +49,13 @@ export const useJobsStore = defineStore('jobs', () => {
    * Backend returns: { job: {...}, progress: float, pending_tasks: int }
    */
   async function fetchJob(id) {
+    // Validate ID parameter
+    if (!id || id === 'undefined' || id === 'null' || isNaN(Number(id)) || Number(id) <= 0) {
+      const msg = 'Invalid job ID provided';
+      error.value = msg;
+      throw new Error(msg);
+    }
+
     loading.value = true
     error.value = null
     try {
@@ -112,6 +119,13 @@ export const useJobsStore = defineStore('jobs', () => {
    * Cancel a job.
    */
   async function cancelJob(id) {
+    // Validate ID parameter
+    if (!id || id === 'undefined' || id === 'null' || isNaN(Number(id)) || Number(id) <= 0) {
+      const msg = 'Invalid job ID provided';
+      error.value = msg;
+      throw new Error(msg);
+    }
+
     loading.value = true
     error.value = null
     try {
@@ -134,6 +148,13 @@ export const useJobsStore = defineStore('jobs', () => {
    * Each task already has record_from, record_to, records_count, operations from the payload.
    */
   async function fetchJobTasks(jobId) {
+    // Validate ID parameter
+    if (!jobId || jobId === 'undefined' || jobId === 'null' || isNaN(Number(jobId)) || Number(jobId) <= 0) {
+      const msg = 'Invalid job ID provided';
+      error.value = msg;
+      throw new Error(msg);
+    }
+
     try {
       const response = await apiClient.get(`/jobs/${jobId}/tasks`)
       // Return the enriched tasks array

@@ -91,15 +91,6 @@ const router = createRouter({
       }
     },
     {
-      path: '/job-monitoring',
-      name: 'job-monitoring-list',
-      component: JobMonitoring,
-      meta: {
-        title: 'Job Monitoring - Task Scheduler',
-        requiresAuth: true
-      }
-    },
-    {
       path: '/notifications',
       name: 'notifications',
       component: Notifications,

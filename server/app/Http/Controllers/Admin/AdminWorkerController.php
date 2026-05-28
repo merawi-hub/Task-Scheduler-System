@@ -5,11 +5,15 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Worker;
 use App\Models\Task;
+use App\Services\WorkerProcessService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 
 class AdminWorkerController extends Controller
 {
+    public function __construct(
+        private WorkerProcessService $workerProcessService
+    ) {}
     /**
      * List all workers with detailed information + heartbeat health
      */
@@ -237,5 +241,100 @@ class AdminWorkerController extends Controller
         ];
 
         return response()->json($stats);
+    }
+
+    // =========================================================================
+    // Worker Process Management (UI-based control)
+    // =========================================================================
+
+    /**
+     * Start a new worker process from the UI
+     */
+    public function startWorker(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'worker_key' => 'required|string|max:64',
+            'sleep' => 'nullable|integer|min:1|max:60',
+            'heartbeat' => 'nullable|integer|min:5|max:120',
+            'fail_rate' => 'nullable|integer|min:0|max:100',
+        ]);
+
+        $result = $this->workerProcessService->startWorker(
+            $validated['worker_key'],
+            [
+                'sleep' => $validated['sleep'] ?? 2,
+                'heartbeat' => $validated['heartbeat'] ?? 15,
+                'fail_rate' => $validated['fail_rate'] ?? 0,
+            ]
+        );
+
+        return response()->json($result, $result['success'] ? 200 : 500);
+    }
+
+    /**
+     * Start multiple workers at once
+     */
+    public function startMultipleWorkers(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'count' => 'required|integer|min:1|max:20',
+            'prefix' => 'nullable|string|max:32',
+            'sleep' => 'nullable|integer|min:1|max:60',
+            'heartbeat' => 'nullable|integer|min:5|max:120',
+            'fail_rate' => 'nullable|integer|min:0|max:100',
+        ]);
+
+        $result = $this->workerProcessService->startMultipleWorkers(
+            $validated['count'],
+            [
+                'prefix' => $validated['prefix'] ?? 'worker',
+                'sleep' => $validated['sleep'] ?? 2,
+                'heartbeat' => $validated['heartbeat'] ?? 15,
+                'fail_rate' => $validated['fail_rate'] ?? 0,
+            ]
+        );
+
+        return response()->json($result);
+    }
+
+    /**
+     * Stop a worker process
+     */
+    public function stopWorker(string $key): JsonResponse
+    {
+        $result = $this->workerProcessService->stopWorker($key);
+        return response()->json($result, $result['success'] ? 200 : 500);
+    }
+
+    /**
+     * Stop all worker processes
+     */
+    public function stopAllWorkers(): JsonResponse
+    {
+        $result = $this->workerProcessService->stopAllWorkers();
+        return response()->json($result);
+    }
+
+    /**
+     * Get all tracked worker processes
+     */
+    public function getWorkerProcesses(): JsonResponse
+    {
+        $processes = $this->workerProcessService->getWorkerProcesses();
+
+        return response()->json([
+            'processes' => $processes,
+            'total' => count($processes),
+            'running' => collect($processes)->where('is_running', true)->count(),
+        ]);
+    }
+
+    /**
+     * Clean up stopped processes from tracking
+     */
+    public function cleanupProcesses(): JsonResponse
+    {
+        $result = $this->workerProcessService->cleanupStoppedProcesses();
+        return response()->json($result);
     }
 }

@@ -107,6 +107,24 @@ class TaskPartitionerService
             $recordFrom = $startIndex + 1;
             $recordTo   = $endIndex + 1;
 
+            // Create complete payload with all required fields
+            $payload = $this->createCompletePayload([
+                'type'          => 'result_processing',
+                'task_number'   => $index + 1,
+                'total_tasks'   => $taskCount,
+                'operations'    => $operations,
+                // 0-based (used by workers)
+                'start_index'   => $startIndex,
+                'end_index'     => $endIndex,
+                // 1-based (used for display)
+                'record_from'   => $recordFrom,
+                'record_to'     => $recordTo,
+                'records_count' => count($chunk),
+                'total_records' => $actualTotal,
+                'job_name'      => $job->name,
+                'records'       => $chunk,
+            ]);
+
             $tasks[] = Task::create([
                 'job_id'          => $job->id,
                 'task_index'      => $index,
@@ -114,22 +132,7 @@ class TaskPartitionerService
                 'retry_count'     => 0,
                 'max_retries'     => $taskConfig['max_retries'],
                 'timeout_seconds' => $taskConfig['timeout_seconds'],
-                'payload'         => [
-                    'type'          => 'result_processing',
-                    'task_number'   => $index + 1,
-                    'total_tasks'   => $taskCount,
-                    'operations'    => $operations,
-                    // 0-based (used by workers)
-                    'start_index'   => $startIndex,
-                    'end_index'     => $endIndex,
-                    // 1-based (used for display)
-                    'record_from'   => $recordFrom,
-                    'record_to'     => $recordTo,
-                    'records_count' => count($chunk),
-                    'total_records' => $actualTotal,
-                    'job_name'      => $job->name,
-                    'records'       => $chunk,
-                ],
+                'payload'         => $payload,
             ]);
         }
 
@@ -192,20 +195,26 @@ class TaskPartitionerService
             $startIndex = $index * $imagesPerTask;
             $endIndex   = min($startIndex + count($imageChunk) - 1, $totalImages - 1);
 
+            // Create complete payload with all required fields
+            $payload = $this->createCompletePayload([
+                'type'         => 'image_processing',
+                'task_number'  => $index + 1,
+                'total_tasks'  => $taskCount,
+                'operations'   => $job->operations ?? $taskConfig['operations'],
+                'start_index'  => $startIndex,
+                'end_index'    => $endIndex,
+                'record_from'  => $startIndex + 1,
+                'record_to'    => $endIndex + 1,
+                'images_count' => count($imageChunk),
+                'records_count' => count($imageChunk), // Alias for consistency
+                'total_records' => $totalImages,
+                'job_name'     => $job->name,
+            ]);
+
             $tasks[] = Task::create([
                 'job_id'           => $job->id,
                 'task_index'       => $index,
-                'payload'          => [
-                    'type'         => 'image_processing',
-                    'task_number'  => $index + 1,
-                    'total_tasks'  => $taskCount,
-                    'operations'   => $job->operations ?? $taskConfig['operations'],
-                    'start_index'  => $startIndex,
-                    'end_index'    => $endIndex,
-                    'record_from'  => $startIndex + 1,
-                    'record_to'    => $endIndex + 1,
-                    'images_count' => count($imageChunk),
-                ],
+                'payload'          => $payload,
                 'input_images'     => $imageChunk,
                 'output_images'    => [],
                 'images_processed' => 0,
@@ -238,7 +247,8 @@ class TaskPartitionerService
             $startIndex = $index * $chunkSize;
             $endIndex   = min($startIndex + count($chunk) - 1, $total - 1);
 
-            $tasks[] = $this->createTask($job, $index, [
+            // Create complete payload with all required fields
+            $payload = $this->createCompletePayload([
                 'type'          => $job->type,
                 'task_number'   => $index + 1,
                 'total_tasks'   => $taskCount,
@@ -248,7 +258,11 @@ class TaskPartitionerService
                 'record_from'   => $startIndex + 1,
                 'record_to'     => $endIndex + 1,
                 'records_count' => count($chunk),
-            ], $taskConfig);
+                'total_records' => $total,
+                'job_name'      => $job->name,
+            ]);
+
+            $tasks[] = $this->createTask($job, $index, $payload, $taskConfig);
         }
 
         return $tasks;
@@ -271,7 +285,8 @@ class TaskPartitionerService
             $startIndex = $i * $itemsPerTask;
             $endIndex   = min(($i + 1) * $itemsPerTask - 1, $totalItems - 1);
 
-            $tasks[] = $this->createTask($job, $i, [
+            // Create complete payload with all required fields
+            $payload = $this->createCompletePayload([
                 'type'          => $job->type,
                 'task_number'   => $i + 1,
                 'total_tasks'   => $taskCount,
@@ -281,8 +296,11 @@ class TaskPartitionerService
                 'record_to'     => $endIndex + 1,
                 'items_count'   => $endIndex - $startIndex + 1,
                 'records_count' => $endIndex - $startIndex + 1,
+                'total_records' => $totalItems,
                 'job_name'      => $job->name,
-            ], $taskConfig);
+            ]);
+
+            $tasks[] = $this->createTask($job, $i, $payload, $taskConfig);
         }
 
         return $tasks;
@@ -291,6 +309,31 @@ class TaskPartitionerService
     // =========================================================================
     // Helpers
     // =========================================================================
+
+    /**
+     * Create a complete payload with all required fields, ensuring no missing keys.
+     * This prevents "Undefined array key" errors when workers access payload fields.
+     *
+     * @param array $payload Base payload data
+     * @return array Complete payload with all required fields
+     */
+    private function createCompletePayload(array $payload): array
+    {
+        // Ensure all required fields exist with safe defaults
+        return array_merge([
+            'type'          => 'generic',
+            'task_number'   => 1,
+            'total_tasks'   => 1,
+            'start_index'   => 0,
+            'end_index'     => 0,
+            'record_from'   => 1,
+            'record_to'     => 1,
+            'records_count' => 0,
+            'total_records' => 0,
+            'operations'    => [],
+            'job_name'      => 'Untitled Job',
+        ], $payload);
+    }
 
     private function createTask(
         SchedulerJob $job,

@@ -1,0 +1,46 @@
+# Documentation and Setup Files (exclude from commits)
+*.txt
+*.md
+!client/package.json
+!server/composer.json
+!client/README.md
+!server/README.md
+
+# Batch and PowerShell Scripts
+*.bat
+*.ps1
+
+# HTML files
+*.html
+
+# VS Code
+.vscode/
+
+# Environment files (keep .env.example)
+.env
+!.env.example
+
+# Node modules
+node_modules/
+
+# Build outputs
+dist/
+build/
+
+# Logs
+*.log
+logs/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+*.swp
+*.swo
+*~
+
+# Temporary files
+tmp/
+temp/

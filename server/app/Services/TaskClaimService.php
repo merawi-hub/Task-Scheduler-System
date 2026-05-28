@@ -102,7 +102,13 @@ class TaskClaimService
                     'status'     => 'running',
                     'started_at' => now(),
                 ]);
+
+                // Send job started notification
+                app(\App\Services\NotificationService::class)->notifyJobStarted($job);
             }
+
+            // ── Normalize payload before returning to worker ──────────────────
+            $task = $this->normalizeTaskPayload($task);
 
             return $task->fresh(['job', 'worker']);
         });
@@ -257,6 +263,12 @@ class TaskClaimService
                     $worker->id,
                     ['reason' => $reason]
                 );
+
+                // Notify admins about task retry limit reached
+                app(\App\Services\NotificationService::class)->notifyTaskRetryLimitReached(
+                    $task->job,
+                    $task->id
+                );
             }
 
             // ── Worker goes back to idle ──────────────────────────────────────
@@ -276,6 +288,68 @@ class TaskClaimService
     // =========================================================================
     // Helpers
     // =========================================================================
+
+    /**
+     * Normalize task payload to ensure all required fields exist with safe defaults.
+     * This prevents "Undefined array key" errors when workers access payload fields.
+     *
+     * @param Task $task
+     * @return Task
+     */
+    private function normalizeTaskPayload(Task $task): Task
+    {
+        $payload = $task->payload ?? [];
+
+        // Ensure payload is an array (handle cases where it might be a string)
+        if (is_string($payload)) {
+            $payload = json_decode($payload, true) ?? [];
+        }
+        if (!is_array($payload)) {
+            $payload = [];
+        }
+
+        // Check if payload is missing required fields
+        $requiredFields = ['start_index', 'end_index', 'records_count'];
+        $missingFields = array_filter($requiredFields, fn($field) => !isset($payload[$field]));
+
+        if (!empty($missingFields)) {
+            // Log warning for debugging
+            \Illuminate\Support\Facades\Log::warning(
+                "Task {$task->id} has incomplete payload, normalizing missing fields: " . implode(', ', $missingFields),
+                [
+                    'task_id' => $task->id,
+                    'job_id' => $task->job_id,
+                    'missing_fields' => $missingFields,
+                    'original_payload' => $payload,
+                ]
+            );
+        }
+
+        // Ensure all required fields exist with safe defaults
+        $normalizedPayload = array_merge([
+            'start_index'   => 0,
+            'end_index'     => 0,
+            'record_from'   => 1,
+            'record_to'     => 1,
+            'records_count' => 0,
+            'total_records' => 0,
+            'operations'    => [],
+        ], $payload);
+
+        // Calculate derived fields if they're missing
+        if (!isset($payload['record_from']) && isset($normalizedPayload['start_index'])) {
+            $normalizedPayload['record_from'] = $normalizedPayload['start_index'] + 1;
+        }
+        if (!isset($payload['record_to']) && isset($normalizedPayload['end_index'])) {
+            $normalizedPayload['record_to'] = $normalizedPayload['end_index'] + 1;
+        }
+
+        // Update and save the normalized payload
+        $task->payload = $normalizedPayload;
+        $task->save();
+
+        return $task;
+    }
 
     /**
      * Get a snapshot of the current pull-based activity:

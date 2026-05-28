@@ -129,7 +129,14 @@ function scrollToTasks() {
 
 let pollingInterval = null
 
-const jobId = computed(() => route.params.id)
+const jobId = computed(() => {
+  const id = route.params.id;
+  // Validate ID is defined and numeric and positive
+  if (!id || id === 'undefined' || id === 'null' || isNaN(Number(id)) || Number(id) <= 0) {
+    return null;
+  }
+  return Number(id);
+})
 
 onMounted(async () => {
   await loadJobData()
@@ -159,6 +166,16 @@ onUnmounted(() => {
 })
 
 async function loadJobData(silent = false) {
+  // Validate job ID before making API calls
+  if (!jobId.value) {
+    error.value = 'Invalid job ID. Please select a valid job.';
+    initialLoading.value = false;
+    loading.value = false;
+    job.value = null;
+    tasks.value = [];
+    return;
+  }
+
   if (!silent) {
     loading.value = true
   }

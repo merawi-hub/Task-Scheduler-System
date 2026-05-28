@@ -19,6 +19,33 @@ class JobController extends Controller
     ) {}
 
     /**
+     * Validate job ID parameter to prevent undefined/null/invalid IDs from causing 500 errors.
+     *
+     * @param mixed $id The job ID parameter to validate
+     * @return JsonResponse|null Returns error response if invalid, null if valid
+     */
+    private function validateJobId($id): ?JsonResponse
+    {
+        // Check if ID is undefined, null, or empty string
+        if ($id === null || $id === '' || $id === 'undefined' || $id === 'null') {
+            return response()->json([
+                'message' => 'Job ID is required and must be a valid positive integer',
+                'error' => 'Invalid job ID parameter',
+            ], 400);
+        }
+        
+        // Check if ID is numeric and positive
+        if (!is_numeric($id) || $id <= 0) {
+            return response()->json([
+                'message' => 'Job ID must be a valid positive integer',
+                'error' => 'Invalid job ID parameter',
+            ], 400);
+        }
+        
+        return null;
+    }
+
+    /**
      * List all jobs with filtering and pagination (user-scoped)
      */
     public function index(Request $request): JsonResponse
@@ -252,8 +279,15 @@ class JobController extends Controller
     /**
      * Get a specific job with all its tasks (user-scoped)
      */
-    public function show(Request $request, int $id): JsonResponse
+    public function show(Request $request, $id): JsonResponse
     {
+        // Validate job ID before processing
+        if ($error = $this->validateJobId($id)) {
+            return $error;
+        }
+        
+        $id = (int) $id; // Safe cast after validation
+
         $job = SchedulerJob::with(['tasks' => function ($query) {
             $query->orderBy('task_index');
         }, 'tasks.worker'])
@@ -278,8 +312,15 @@ class JobController extends Controller
      * Get completion summary for a finished job.
      * Shows total duration, task stats, throughput, and worker contributions.
      */
-    public function completionSummary(Request $request, int $id): JsonResponse
+    public function completionSummary(Request $request, $id): JsonResponse
     {
+        // Validate job ID before processing
+        if ($error = $this->validateJobId($id)) {
+            return $error;
+        }
+        
+        $id = (int) $id; // Safe cast after validation
+
         $job = SchedulerJob::where('id', $id)
             ->where('user_id', $request->user()->id)
             ->first();
@@ -391,8 +432,15 @@ class JobController extends Controller
      * Get retry statistics for a job — shows exponential backoff schedule
      * and retry history per task. Used by the RetryPanel component.
      */
-    public function retryStats(Request $request, int $id): JsonResponse
+    public function retryStats(Request $request, $id): JsonResponse
     {
+        // Validate job ID before processing
+        if ($error = $this->validateJobId($id)) {
+            return $error;
+        }
+        
+        $id = (int) $id; // Safe cast after validation
+
         $job = SchedulerJob::where('id', $id)
             ->where('user_id', $request->user()->id)
             ->first();
@@ -484,8 +532,15 @@ class JobController extends Controller
         $s = $seconds % 60;
         return $s > 0 ? "{$m}m {$s}s" : "{$m}m";
     }
-    public function statusPoll(Request $request, int $id): JsonResponse
+    public function statusPoll(Request $request, $id): JsonResponse
     {
+        // Validate job ID before processing
+        if ($error = $this->validateJobId($id)) {
+            return $error;
+        }
+        
+        $id = (int) $id; // Safe cast after validation
+
         $job = SchedulerJob::where('id', $id)
             ->where('user_id', $request->user()->id)
             ->first();
@@ -545,8 +600,15 @@ class JobController extends Controller
      * Get tasks for a specific job (user-scoped)
      * Returns the full task list with payload details for the Tasks tab.
      */
-    public function tasks(Request $request, int $id): JsonResponse
+    public function tasks(Request $request, $id): JsonResponse
     {
+        // Validate job ID before processing
+        if ($error = $this->validateJobId($id)) {
+            return $error;
+        }
+        
+        $id = (int) $id; // Safe cast after validation
+
         $job = SchedulerJob::where('id', $id)
             ->where('user_id', $request->user()->id)
             ->first();
@@ -571,7 +633,18 @@ class JobController extends Controller
 
         // Enrich each task with display-friendly fields from its payload
         $enriched = $tasks->map(function ($task) use ($job) {
-            $payload = $task->payload ?? [];
+            // Safe payload access with validation
+            $payload = is_array($task->payload) ? $task->payload : [];
+            
+            // Safe access with defaults for all payload fields
+            $startIndex = $payload['start_index'] ?? 0;
+            $endIndex = $payload['end_index'] ?? 0;
+            $recordFrom = $payload['record_from'] ?? ($startIndex + 1);
+            $recordTo = $payload['record_to'] ?? ($endIndex + 1);
+            $recordsCount = $payload['records_count'] ?? $payload['items_count'] ?? 0;
+            $totalRecords = $payload['total_records'] ?? null;
+            $operations = $payload['operations'] ?? [];
+            
             return [
                 // Database columns
                 'id'              => $task->id,
@@ -593,14 +666,14 @@ class JobController extends Controller
                     'worker_key' => $task->worker->worker_key,
                     'hostname'   => $task->worker->hostname,
                 ] : null,
-                // Payload-derived display fields
+                // Payload-derived display fields (safely accessed)
                 'task_number'     => $task->task_index + 1,
-                'record_from'     => $payload['record_from']   ?? ($payload['start_index'] + 1 ?? null),
-                'record_to'       => $payload['record_to']     ?? ($payload['end_index']   + 1 ?? null),
-                'records_count'   => $payload['records_count'] ?? $payload['items_count']  ?? null,
-                'total_records'   => $payload['total_records'] ?? null,
-                'operations'      => $payload['operations']    ?? [],
-                'payload_type'    => $payload['type']          ?? $job->type,
+                'record_from'     => $recordFrom,
+                'record_to'       => $recordTo,
+                'records_count'   => $recordsCount,
+                'total_records'   => $totalRecords,
+                'operations'      => $operations,
+                'payload_type'    => $payload['type'] ?? $job->type,
                 // Full payload (for detail view)
                 'payload'         => $payload,
             ];
@@ -627,10 +700,79 @@ class JobController extends Controller
     }
 
     /**
+     * Retry failed tasks for a job (user-scoped)
+     */
+    public function retry(Request $request, $id): JsonResponse
+    {
+        // Validate job ID before processing
+        if ($error = $this->validateJobId($id)) {
+            return $error;
+        }
+        
+        $id = (int) $id; // Safe cast after validation
+
+        $job = SchedulerJob::where('id', $id)
+            ->where('user_id', $request->user()->id)
+            ->first();
+
+        if (!$job) {
+            return response()->json([
+                'message' => 'Job not found or access denied',
+            ], 404);
+        }
+
+        // Find all failed tasks that can be retried
+        $failedTasks = $job->tasks()->where('status', 'failed')->get();
+
+        if ($failedTasks->isEmpty()) {
+            return response()->json([
+                'message' => 'No failed tasks to retry',
+            ], 400);
+        }
+
+        $retriedCount = 0;
+        foreach ($failedTasks as $task) {
+            if ($task->retry_count < $task->max_retries) {
+                $task->update([
+                    'status' => 'pending',
+                    'worker_id' => null,
+                    'retry_count' => $task->retry_count + 1,
+                    'available_after' => now(),
+                    'assigned_at' => null,
+                    'started_at' => null,
+                    'completed_at' => null,
+                ]);
+                $retriedCount++;
+            }
+        }
+
+        // Update job status if it was failed
+        if ($job->status === 'failed' && $retriedCount > 0) {
+            $job->update(['status' => 'running']);
+        }
+
+        // Recalculate job status
+        $this->jobStatusService->recalculate($job);
+
+        return response()->json([
+            'message' => "Retried {$retriedCount} failed task(s)",
+            'retried_count' => $retriedCount,
+            'job' => $job->fresh(),
+        ]);
+    }
+
+    /**
      * Cancel a job (user-scoped)
      */
-    public function destroy(Request $request, int $id): JsonResponse
+    public function destroy(Request $request, $id): JsonResponse
     {
+        // Validate job ID before processing
+        if ($error = $this->validateJobId($id)) {
+            return $error;
+        }
+        
+        $id = (int) $id; // Safe cast after validation
+
         $job = SchedulerJob::where('id', $id)
             ->where('user_id', $request->user()->id)
             ->first();
@@ -659,8 +801,15 @@ class JobController extends Controller
     /**
      * Download processed images for a job
      */
-    public function download(Request $request, int $id): JsonResponse
+    public function download(Request $request, $id): JsonResponse
     {
+        // Validate job ID before processing
+        if ($error = $this->validateJobId($id)) {
+            return $error;
+        }
+        
+        $id = (int) $id; // Safe cast after validation
+
         $job = SchedulerJob::where('id', $id)
             ->where('user_id', $request->user()->id)
             ->first();

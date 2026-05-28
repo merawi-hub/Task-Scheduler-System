@@ -8,15 +8,26 @@
             <h1 class="text-2xl font-bold text-gray-900">Worker Management</h1>
             <p class="text-sm text-gray-500 mt-1">Monitor and manage worker nodes</p>
           </div>
-          <button
-            @click="refreshWorkers"
-            class="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
-          >
-            <svg class="w-5 h-5" :class="{ 'animate-spin': loading }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-            </svg>
-            <span class="text-sm font-medium">Refresh</span>
-          </button>
+          <div class="flex items-center gap-3">
+            <button
+              @click="showWorkerModal = true"
+              class="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg hover:from-indigo-700 hover:to-purple-700 transition-all shadow-md hover:shadow-lg"
+            >
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+              </svg>
+              <span class="text-sm font-medium">Start Workers</span>
+            </button>
+            <button
+              @click="refreshWorkers"
+              class="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+            >
+              <svg class="w-5 h-5" :class="{ 'animate-spin': loading }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              <span class="text-sm font-medium">Refresh</span>
+            </button>
+          </div>
         </div>
       </div>
     </header>
@@ -206,6 +217,13 @@
         </div>
       </div>
     </main>
+
+    <!-- Worker Management Modal -->
+    <WorkerManagementModal
+      :is-open="showWorkerModal"
+      @close="showWorkerModal = false"
+      @workers-started="refreshWorkers"
+    />
   </div>
 </template>
 
@@ -215,6 +233,7 @@ import { useAdminStore } from '@/stores/adminStore'
 import WorkerActivityPanel from '@/components/WorkerActivityPanel.vue'
 import LoadBalancePanel from '@/components/LoadBalancePanel.vue'
 import FaultTolerancePanel from '@/components/FaultTolerancePanel.vue'
+import WorkerManagementModal from '@/components/modals/WorkerManagementModal.vue'
 
 const adminStore = useAdminStore()
 
@@ -222,6 +241,7 @@ const workers = ref([])
 const workerSummary = ref(null)
 const loading = ref(false)
 const error = ref(null)
+const showWorkerModal = ref(false)
 
 function getStatusClass(status) {
   const classes = {
@@ -299,7 +319,7 @@ async function refreshWorkers() {
 
 async function markDead(workerKey) {
   if (!confirm('Are you sure you want to mark this worker as dead? Its running tasks will be released.')) return
-  
+
   const result = await adminStore.markWorkerDead(workerKey)
   if (result.success) {
     alert('Worker marked as dead')
@@ -311,7 +331,7 @@ async function markDead(workerKey) {
 
 async function deleteWorker(workerKey) {
   if (!confirm('Are you sure you want to remove this worker from the system?')) return
-  
+
   const result = await adminStore.deleteWorker(workerKey)
   if (result.success) {
     alert('Worker removed successfully')

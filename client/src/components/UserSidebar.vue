@@ -70,21 +70,6 @@
             </svg>
             <span>My Jobs</span>
           </router-link>
-
-          <router-link
-            to="/job-monitoring"
-            :class="[
-              'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors',
-              isActive('/job-monitoring')
-                ? 'bg-indigo-600 text-white'
-                : 'text-gray-700 hover:bg-gray-100'
-            ]"
-          >
-            <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
-            </svg>
-            <span>Job Monitoring</span>
-          </router-link>
         </div>
       </div>
 
@@ -198,9 +183,10 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/authStore'
+import { notificationsApi } from '@/api'
 import LogoutConfirmModal from '@/components/modals/LogoutConfirmModal.vue'
 
 const route = useRoute()
@@ -210,9 +196,37 @@ const authStore = useAuthStore()
 const user = computed(() => authStore.user)
 const showLogoutModal = ref(false)
 const loggingOut = ref(false)
+const unreadCount = ref(0)
 
-// Placeholder unread notification count — replace with real store value when available
-const unreadCount = ref(3)
+let pollInterval = null
+
+const fetchUnreadCount = async () => {
+  // Only fetch if user is authenticated
+  if (!authStore.user || !authStore.token) {
+    return
+  }
+
+  try {
+    const data = await notificationsApi.getUnreadCount()
+    unreadCount.value = data.unread_count
+  } catch (error) {
+    // Silently fail - user might not be authenticated
+    console.debug('Could not fetch unread count:', error)
+  }
+}
+
+// Poll for new notifications every 30 seconds
+const startPolling = () => {
+  fetchUnreadCount()
+  pollInterval = setInterval(fetchUnreadCount, 30000)
+}
+
+const stopPolling = () => {
+  if (pollInterval) {
+    clearInterval(pollInterval)
+    pollInterval = null
+  }
+}
 
 function isActive(path) {
   if (path === '/dashboard') return route.path === '/dashboard'
@@ -238,4 +252,12 @@ async function handleLogout() {
     loggingOut.value = false
   }
 }
+
+onMounted(() => {
+  startPolling()
+})
+
+onUnmounted(() => {
+  stopPolling()
+})
 </script>

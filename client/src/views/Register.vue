@@ -116,9 +116,9 @@
             <div class="ml-3 text-sm">
               <label for="terms" class="text-[#64748b] cursor-pointer select-none">
                 I agree to the
-                <a href="#" class="font-medium text-indigo-600 hover:text-indigo-500 transition-colors">Terms of Service</a>
+                <a @click.prevent="openTerms" href="#" class="font-medium text-indigo-600 hover:text-indigo-500 transition-colors">Terms of Service</a>
                 and
-                <a href="#" class="font-medium text-indigo-600 hover:text-indigo-500 transition-colors">Privacy Policy</a>
+                <a @click.prevent="openPrivacy" href="#" class="font-medium text-indigo-600 hover:text-indigo-500 transition-colors">Privacy Policy</a>
               </label>
             </div>
           </div>
@@ -332,5 +332,13 @@ async function handleRegister() {
   }
 
   loading.value = false
+}
+
+function openTerms() {
+  window.open('/terms-of-service', '_blank')
+}
+
+function openPrivacy() {
+  window.open('/privacy-policy', '_blank')
 }
 </script>

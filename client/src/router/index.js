@@ -46,6 +46,22 @@ const router = createRouter({
       }
     },
     {
+      path: '/terms-of-service',
+      name: 'terms-of-service',
+      component: () => import('@/views/TermsOfService.vue'),
+      meta: {
+        title: 'Terms of Service - Task Scheduler'
+      }
+    },
+    {
+      path: '/privacy-policy',
+      name: 'privacy-policy',
+      component: () => import('@/views/PrivacyPolicy.vue'),
+      meta: {
+        title: 'Privacy Policy - Task Scheduler'
+      }
+    },
+    {
       path: '/dashboard',
       name: 'dashboard',
       component: UserDashboard,

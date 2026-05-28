@@ -10,7 +10,7 @@
           </div>
           <div class="flex items-center gap-4">
               <!-- Notifications -->
-              <button class="relative p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100">
+              <button @click="$router.push('/admin/notifications')" class="relative p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
                 </svg>
@@ -18,11 +18,10 @@
               </button>
 
               <!-- Settings -->
-              <button class="relative p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100">
+              <button @click="$router.push('/admin/settings')" class="relative p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                 </svg>
-                <span class="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
               </button>
 
               <!-- Refresh Button -->
@@ -47,9 +46,9 @@
       <!-- Dashboard Content -->
       <main class="p-8">
         <!-- Stats Cards -->
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
           <!-- Total Jobs -->
-          <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+          <div @click="navigateToJobs()" class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 cursor-pointer hover:shadow-md transition-shadow">
             <div class="flex items-start justify-between">
               <div>
                 <p class="text-sm font-medium text-gray-500">Total Jobs</p>
@@ -67,27 +66,27 @@
             </div>
           </div>
 
-          <!-- Completed -->
-          <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+          <!-- Pending -->
+          <div @click="navigateToJobs('pending')" class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 cursor-pointer hover:shadow-md transition-shadow">
             <div class="flex items-start justify-between">
               <div>
-                <p class="text-sm font-medium text-gray-500">Completed</p>
-                <h3 class="text-3xl font-bold text-gray-900 mt-2">{{ stats.completed }}</h3>
-                <p class="text-sm mt-2" :class="stats.completedChange >= 0 ? 'text-green-600' : 'text-red-600'">
-                  <span class="font-medium">{{ stats.completedChange >= 0 ? '+' : '' }}{{ stats.completedChange }}%</span>
+                <p class="text-sm font-medium text-gray-500">Pending</p>
+                <h3 class="text-3xl font-bold text-gray-900 mt-2">{{ stats.pending }}</h3>
+                <p class="text-sm mt-2" :class="stats.pendingChange >= 0 ? 'text-green-600' : 'text-red-600'">
+                  <span class="font-medium">{{ stats.pendingChange >= 0 ? '+' : '' }}{{ stats.pendingChange }}%</span>
                   <span class="text-gray-500 ml-1">vs yesterday</span>
                 </p>
               </div>
-              <div class="p-3 bg-green-50 rounded-lg">
-                <svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              <div class="p-3 bg-yellow-50 rounded-lg">
+                <svg class="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
               </div>
             </div>
           </div>
 
           <!-- Running -->
-          <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+          <div @click="navigateToJobs('running')" class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 cursor-pointer hover:shadow-md transition-shadow">
             <div class="flex items-start justify-between">
               <div>
                 <p class="text-sm font-medium text-gray-500">Running</p>
@@ -105,8 +104,27 @@
             </div>
           </div>
 
+          <!-- Completed -->
+          <div @click="navigateToJobs('completed')" class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 cursor-pointer hover:shadow-md transition-shadow">
+            <div class="flex items-start justify-between">
+              <div>
+                <p class="text-sm font-medium text-gray-500">Completed</p>
+                <h3 class="text-3xl font-bold text-gray-900 mt-2">{{ stats.completed }}</h3>
+                <p class="text-sm mt-2" :class="stats.completedChange >= 0 ? 'text-green-600' : 'text-red-600'">
+                  <span class="font-medium">{{ stats.completedChange >= 0 ? '+' : '' }}{{ stats.completedChange }}%</span>
+                  <span class="text-gray-500 ml-1">vs yesterday</span>
+                </p>
+              </div>
+              <div class="p-3 bg-green-50 rounded-lg">
+                <svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+            </div>
+          </div>
+
           <!-- Failed -->
-          <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+          <div @click="navigateToJobs('failed')" class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 cursor-pointer hover:shadow-md transition-shadow">
             <div class="flex items-start justify-between">
               <div>
                 <p class="text-sm font-medium text-gray-500">Failed</p>
@@ -220,11 +238,13 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { useAdminStore } from '@/stores/adminStore'
 import LineChart from '@/components/charts/LineChart.vue'
 import DonutChart from '@/components/charts/DonutChart.vue'
 import WorkerControlPanel from '@/components/WorkerControlPanel.vue'
 
+const router = useRouter()
 const adminStore = useAdminStore()
 const loading = ref(false)
 const refreshInterval = ref(null)
@@ -235,6 +255,7 @@ const stats = computed(() => {
   if (!metrics) {
     return {
       totalJobs: 0, jobsChange: 0,
+      pending: 0, pendingChange: 0,
       completed: 0, completedChange: 0,
       running: 0, runningChange: 0,
       failed: 0, failedChange: 0
@@ -243,6 +264,7 @@ const stats = computed(() => {
 
   // Admin metrics structure: { realtime: { jobs, tasks, workers }, jobs, tasks, workers }
   const jobs = metrics.jobs || metrics.realtime?.jobs || {}
+  const tasks = metrics.tasks || metrics.realtime?.tasks || {}
   const history = adminStore.metricsHistory?.legacy_history?.data || []
   const taskHistory = adminStore.metricsHistory?.history?.tasks_completed || []
   const taskFailedHistory = adminStore.metricsHistory?.history?.tasks_failed || []
@@ -250,6 +272,8 @@ const stats = computed(() => {
   return {
     totalJobs: jobs.total || 0,
     jobsChange: calcChangeFromSeries(history.map(item => item.jobs_created || 0)),
+    pending: jobs.pending || tasks.pending || 0,
+    pendingChange: 0,
     completed: jobs.completed || 0,
     completedChange: calcChangeFromSeries(taskHistory.map(item => item.count || 0)),
     running: jobs.running || 0,
@@ -258,6 +282,15 @@ const stats = computed(() => {
     failedChange: calcChangeFromSeries(taskFailedHistory.map(item => item.count || 0))
   }
 })
+
+// Navigate to jobs page with optional status filter
+function navigateToJobs(status = null) {
+  if (status) {
+    router.push({ path: '/admin/jobs', query: { status } })
+  } else {
+    router.push('/admin/jobs')
+  }
+}
 
 // Jobs chart data
 const jobsChartData = computed(() => {

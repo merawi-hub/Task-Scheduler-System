@@ -6,17 +6,34 @@
         <div class="flex items-center justify-between">
           <div>
             <h1 class="text-2xl font-bold text-gray-900">All Jobs</h1>
-            <p class="text-sm text-gray-500 mt-1">Manage all jobs from all users</p>
+            <p class="text-sm text-gray-500 mt-1">
+              Manage all jobs from all users
+              <span v-if="selectedStatus" class="ml-2 px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded text-xs font-medium">
+                Filtered by: {{ selectedStatus }}
+              </span>
+            </p>
           </div>
-          <button
-            @click="refreshJobs"
-            class="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
-          >
-            <svg class="w-5 h-5" :class="{ 'animate-spin': loading }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-            </svg>
-            <span class="text-sm font-medium">Refresh</span>
-          </button>
+          <div class="flex items-center gap-3">
+            <button
+              v-if="selectedStatus"
+              @click="$router.push('/admin/jobs')"
+              class="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+            >
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+              <span class="text-sm font-medium">Clear Filter</span>
+            </button>
+            <button
+              @click="refreshJobs"
+              class="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+            >
+              <svg class="w-5 h-5" :class="{ 'animate-spin': loading }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              <span class="text-sm font-medium">Refresh</span>
+            </button>
+          </div>
         </div>
       </div>
     </header>
@@ -108,15 +125,31 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { useAdminStore } from '@/stores/adminStore'
 import StatusBadge from '@/components/StatusBadge.vue'
 
+const route = useRoute()
 const adminStore = useAdminStore()
 
-const jobs = ref([])
+const allJobs = ref([])
 const loading = ref(false)
 const error = ref(null)
+const selectedStatus = ref(route.query.status || null)
+
+// Filter jobs based on selected status
+const jobs = computed(() => {
+  if (!selectedStatus.value) {
+    return allJobs.value
+  }
+  return allJobs.value.filter(job => job.status === selectedStatus.value)
+})
+
+// Watch for route query changes
+watch(() => route.query.status, (newStatus) => {
+  selectedStatus.value = newStatus || null
+})
 
 function calculateProgress(job) {
   if (job.total_tasks === 0) return 0
@@ -140,7 +173,7 @@ async function refreshJobs() {
   const result = await adminStore.fetchAllJobs({ per_page: 100, sort_by: 'created_at', sort_order: 'desc' })
   if (result.success) {
     // Response is paginated: { current_page, data: [...], total, ... }
-    jobs.value = result.data.data || []
+    allJobs.value = result.data.data || []
   } else {
     error.value = result.error
   }

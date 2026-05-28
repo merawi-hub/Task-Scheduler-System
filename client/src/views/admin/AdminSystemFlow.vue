@@ -405,11 +405,11 @@ const taskStats = computed(() => {
   const metrics = adminStore.systemMetrics
   const t = metrics?.tasks || metrics?.realtime?.tasks || {}
   return [
-    { label: 'Total',    value: t.total    ?? 0, dot: 'bg-gray-400',   color: 'text-gray-700'   },
-    { label: 'Running',  value: t.running  ?? 0, dot: 'bg-indigo-500 animate-pulse', color: 'text-indigo-600' },
-    { label: 'Done',     value: t.done || t.completed ?? 0, dot: 'bg-green-500',  color: 'text-green-600'  },
-    { label: 'Pending',  value: t.pending  ?? 0, dot: 'bg-yellow-500', color: 'text-yellow-600' },
-    { label: 'Failed',   value: t.failed   ?? 0, dot: 'bg-red-500',    color: 'text-red-600'    },
+    { label: 'Total',    value: t.total ?? 0, dot: 'bg-gray-400',   color: 'text-gray-700'   },
+    { label: 'Running',  value: t.running ?? 0, dot: 'bg-indigo-500 animate-pulse', color: 'text-indigo-600' },
+    { label: 'Done',     value: (t.done || t.completed) ?? 0, dot: 'bg-green-500',  color: 'text-green-600'  },
+    { label: 'Pending',  value: t.pending ?? 0, dot: 'bg-yellow-500', color: 'text-yellow-600' },
+    { label: 'Failed',   value: t.failed ?? 0, dot: 'bg-red-500',    color: 'text-red-600'    },
   ]
 })
 

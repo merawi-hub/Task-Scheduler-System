@@ -144,13 +144,8 @@ const menuItems = [
   },
   {
     path: '/admin/jobs',
-    label: 'Jobs',
+    label: 'Jobs & Tasks',
     icon: 'BriefcaseIcon'
-  },
-  {
-    path: '/admin/tasks',
-    label: 'Tasks',
-    icon: 'CheckSquareIcon'
   },
   {
     path: '/admin/workers',
